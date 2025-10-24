@@ -15,6 +15,7 @@
     "start:prod": "npm run react-build && electron .",
     "start:pure": "electron ./Electron_Puro/main.js",
     "build:pure:dir": "electron-builder --config electron-builder.pure.json --win dir",
+    "build:pure:portable": "electron-builder --config electron-builder.pure.json --win portable",
     "build:mac": "npm run react-build && electron-builder --mac",
     "build:linux": "npm run react-build && electron-builder --linux",
     "postinstall": "electron-builder install-app-deps",
