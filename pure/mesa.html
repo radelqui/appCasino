@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mesa - Emisión de Vouchers</title>
+  <link rel="stylesheet" href="./style.css" />
+  <style>
+    body{font-family:system-ui,Segoe UI,Arial;background:#0b1220;color:#e5e7eb}
+    .card{background:#0f172a;border:1px solid #1f2937;border-radius:12px;padding:16px;max-width:980px;margin:16px auto}
+    .row{display:flex;gap:12px;flex-wrap:wrap}
+    .col{flex:1 1 220px}
+    .label{font-size:12px;color:#9ca3af;margin-bottom:6px}
+    .input,select{width:100%;padding:8px;border-radius:8px;border:1px solid #334155;background:#111827;color:#e5e7eb}
+    .button{padding:10px 14px;border-radius:8px;border:1px solid #334155;background:#1f2937;color:#e5e7eb;cursor:pointer}
+    .status{margin-top:12px;font-size:14px}
+    iframe{border:1px solid #334155;border-radius:8px}
+    nav .button { margin-left: 8px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Mesa</h1>
+    <nav>
+       <a id="linkCaja" href="./caja.html">Caja</a>
+       <button class="button" id="btnSalir">Salir</button>
+    </nav>
+  </header>
+
+  <main>
+    <section class="card">
+      <h2>Emisión de voucher</h2>
+      <div class="row">
+        <div class="col">
+          <div class="label">Valor</div>
+          <input id="valor" class="input" type="number" min="0" step="0.01" value="335.45" />
+        </div>
+        <div class="col">
+          <div class="label">Moneda</div>
+          <select id="moneda" class="input"><option value="DOP">DOP</option><option value="USD">USD</option></select>
+        </div>
+        <div class="col">
+          <div class="label">Mesa</div>
+          <input id="mesa" class="input" value="P03" />
+        </div>
+        <div class="col">
+          <div class="label">Emitido por</div>
+          <input id="usuario" class="input" value="Operador" />
+        </div>
+      </div>
+      <div style="margin-top:12px">
+        <button class="button" id="emitir">Emitir voucher</button>
+        <span id="status" class="status"></span>
+      </div>
+    </section>
+
+    <section class="card" id="preview-section">
+      <h2>Vista previa del ticket</h2>
+      <div style="margin-top:12px">
+        <iframe id="preview-ticket" width="420" height="640"></iframe>
+      </div>
+    </section>
+
+    <section class="card" id="config-section" style="display:none">
+      <h2>Perfil de impresión</h2>
+      <div class="row">
+        <div class="col">
+          <div class="label">Modo</div>
+          <select id="mode" class="input">
+            <option value="PDF">PDF</option>
+            <option value="ESCPOS">ESCPOS</option>
+          </select>
+        </div>
+        <div class="col">
+          <div class="label">Ancho (mm)</div>
+          <select id="width" class="input">
+            <option value="80">80</option>
+            <option value="58">58</option>
+          </select>
+        </div>
+        <div class="col">
+          <div class="label">Alto (mm)</div>
+          <input id="height" class="input" type="number" min="80" max="400" step="1" value="156" />
+        </div>
+      </div>
+      <div style="margin-top:12px">
+        <button class="button" id="guardar">Guardar perfil</button>
+        <button class="button" id="vista">Vista previa</button>
+        <button class="button" id="imprimir">Imprimir</button>
+        <small style="margin-left:8px">Se guarda en el perfil del usuario de la app.</small>
+      </div>
+      <div style="margin-top:12px">
+        <iframe id="preview" width="420" height="640"></iframe>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <small>Sistema TITO · Emisión en Mesa</small>
+  </footer>
+
+  <script>
+    const statusEl = document.getElementById('status');
+    function msg(text, ok=true){ statusEl.textContent = text; statusEl.style.color = ok? '#10b981' : '#ef4444'; }
+
+    // Navegación: solo Salir (Inicio y Salir hacían lo mismo)
+    document.getElementById('btnSalir').addEventListener('click', async () => {
+      try { await window.api?.closeCurrent?.(); } catch (_) { try { window.close(); } catch {} }
+    });
+
+    // Emisión y prueba
+    async function emitir(){
+      const valor = parseFloat(document.getElementById('valor').value || '0');
+      const moneda = document.getElementById('moneda').value || 'DOP';
+      const mesa_id = document.getElementById('mesa').value || 'P01';
+      const usuario_emision = document.getElementById('usuario').value || 'Operador';
+      try {
+        if (!window.api?.generateTicket) throw new Error('API de Electron no disponible');
+        const result = await window.api.generateTicket({ valor, moneda, mesa_id, usuario_emision });
+        msg(`Emitido ticket ${result.ticket_number} (${result.moneda} ${Number(result.valor).toFixed(2)})`);
+      } catch(e) {
+        console.error(e); msg(`Error: ${e.message}`, false);
+      }
+    }
+
+
+    // Perfil de impresión
+    const modeEl = document.getElementById('mode');
+    const widthEl = document.getElementById('width');
+    const heightEl = document.getElementById('height');
+    const previewEl = document.getElementById('preview');
+    const previewTicketEl = document.getElementById('preview-ticket');
+
+    async function cargarPerfil(){
+      try {
+        const resp = await window.api?.getPrintProfile?.();
+        const cur = resp?.current || { mode:'PDF', width_mm:80, height_mm:156 };
+        modeEl.value = (cur.mode || 'PDF').toUpperCase();
+        widthEl.value = String(cur.width_mm || 80);
+        heightEl.value = Number(cur.height_mm || 156);
+      } catch(e) { console.warn('Sin IPC, usando valores por defecto'); }
+    }
+    async function guardarPerfil(){
+      const payload = { mode: modeEl.value, width_mm: Number(widthEl.value), height_mm: Number(heightEl.value) };
+      try {
+        const resp = await window.api?.setPrintProfile?.(payload);
+        if (resp?.success) msg(`Perfil guardado: ${resp.current.mode} ${resp.current.width_mm}x${resp.current.height_mm}mm`);
+        else msg('Perfil actualizado localmente');
+      } catch(e) { msg(`Error guardando perfil: ${e.message}`, false); }
+    }
+    async function vistaPrevia(){
+      try {
+        const valor = parseFloat(document.getElementById('valor').value || '0');
+        const moneda = document.getElementById('moneda').value || 'DOP';
+        const mesa_id = document.getElementById('mesa').value || 'P01';
+        const usuario_emision = document.getElementById('usuario').value || 'VistaPrevia';
+        const payload = { valor, moneda, mesa_id, usuario_emision, pageWidthMm: Number(widthEl.value || 80), pageHeightMm: Number(heightEl.value || 156) };
+        const resp = await window.api?.getTicketPreview?.(payload);
+        if (resp?.success && resp.dataUrl && previewTicketEl) { previewTicketEl.src = resp.dataUrl; }
+        else {
+          const qs = new URLSearchParams({ valor: String(valor || '123.45'), moneda, ancho: String(widthEl.value || '80'), alto: String(heightEl.value || '156'), mesa_id, usuario_emision });
+          if (previewTicketEl) { previewTicketEl.src = `http://localhost:8088/voucher.pdf?${qs.toString()}`; }
+        }
+      } catch(e) { console.warn('Vista previa fallback', e.message); }
+    }
+    // Vista previa directa en Mesa según valor/moneda (altura automática)
+    function actualizarVistaPrevia(){
+      try {
+        const valor = parseFloat(document.getElementById('valor').value || '0');
+        const moneda = document.getElementById('moneda').value || 'DOP';
+        const mesa_id = document.getElementById('mesa').value || 'P01';
+        const usuario_emision = document.getElementById('usuario').value || 'VistaPrevia';
+        const qs = new URLSearchParams({ valor: String(valor || '0'), moneda, ancho: '80', mesa_id, usuario_emision });
+        if (previewTicketEl) previewTicketEl.src = `http://localhost:8088/voucher.pdf?${qs.toString()}`;
+      } catch(e) { console.warn('No se pudo actualizar la vista previa en Mesa:', e.message); }
+    }
+
+    function imprimir(){
+      try {
+        // Intentar imprimir el contenido del iframe (visor PDF)
+        const win = previewEl.contentWindow;
+        if (win && typeof win.print === 'function') {
+          win.focus();
+          win.print();
+          return;
+        }
+      } catch (_) {}
+      // Fallback: abrir en una nueva ventana y disparar print
+      const src = previewEl?.src;
+      if (!src) { msg('Primero genera la vista previa', false); return; }
+      const w = window.open(src, '_blank');
+      if (!w) { msg('No se pudo abrir la vista para imprimir', false); return; }
+      const trigger = () => { try { w.focus(); w.print(); } catch (e) { msg('No se pudo imprimir: ' + e.message, false); } };
+      try { w.addEventListener('load', trigger); } catch (_) {}
+      setTimeout(trigger, 800); // por si el visor PDF no dispara load
+    }
+
+    document.getElementById('emitir').addEventListener('click', emitir);
+
+    document.getElementById('guardar').addEventListener('click', guardarPerfil);
+    document.getElementById('vista').addEventListener('click', vistaPrevia);
+    document.getElementById('imprimir').addEventListener('click', imprimir);
+
+    // Init
+    cargarPerfil().then(vistaPrevia);
+    cargarPerfil().then(vistaPrevia);
+    actualizarVistaPrevia();
+
+    ['valor','moneda','mesa','usuario'].forEach(id => {
+      const el = document.getElementById(id);
+      el?.addEventListener('input', actualizarVistaPrevia);
+      el?.addEventListener('change', actualizarVistaPrevia);
+    });
+
+    // Restricciones por rol: ocultar Caja y/o Configuración
+    (async () => {
+      try {
+        const role = String(await (window.api?.getRole?.() || Promise.resolve('MESA'))).toUpperCase();
+        // Mesa no puede acceder a Caja
+        if (role === 'MESA') {
+          document.getElementById('linkCaja')?.setAttribute('style','display:none');
+        }
+        // Auditor no puede acceder a Configuración
+        if (role === 'AUDITOR') {
+          document.getElementById('config-section')?.setAttribute('style','display:none');
+        }
+      } catch (e) {
+        console.warn('Restricciones por rol no aplicadas:', e.message);
+      }
+    })();
+  </script>
+</body>
+</html>

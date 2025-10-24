@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Caja - Validación de Vouchers</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Caja</h1>
+            <nav>
+                <button id="volverPanel">Volver al Panel</button>
+                <button id="salir">Salir</button>
+            </nav>
+        </header>
+
+        <section class="validate">
+            <h2>Validar Voucher</h2>
+            <input type="text" id="voucherCode" placeholder="Código del voucher">
+            <button id="validateBtn">Validar</button>
+            <div id="validationResult"></div>
+        </section>
+
+        <section class="redeem" style="display:none;">
+            <h2>Cobrar Voucher</h2>
+            <div id="voucherDetails"></div>
+            <button id="redeemBtn">Cobrar</button>
+            <button id="cancelBtn">Cancelar</button>
+        </section>
+
+        <section class="stats">
+            <h2>Estadísticas de Hoy</h2>
+            <div class="stats-grid">
+                <div><strong>Tickets Hoy:</strong> <span id="ticketsHoy">0</span></div>
+                <div><strong>Total DOP:</strong> <span id="totalDOP">0</span></div>
+                <div><strong>Total USD:</strong> <span id="totalUSD">0</span></div>
+                <div><strong>Pendientes:</strong> <span id="pendientes">0</span></div>
+            </div>
+        </section>
+    </div>
+
+    <script>
+        const resultDiv = document.getElementById('validationResult');
+        const voucherDetailsDiv = document.getElementById('voucherDetails');
+        const redeemSection = document.querySelector('.redeem');
+        const validateBtn = document.getElementById('validateBtn');
+        const redeemBtn = document.getElementById('redeemBtn');
+        const cancelBtn = document.getElementById('cancelBtn');
+        const volverPanelBtn = document.getElementById('volverPanel');
+        const salirBtn = document.getElementById('salir');
+
+        function hasIPC() {
+            return typeof window !== 'undefined' && window.api && typeof window.api.validateTicket === 'function';
+        }
+
+        async function loadStats() {
+            try {
+                if (!hasIPC()) throw new Error('IPC no disponible en este entorno');
+                const stats = await window.api.getStatsToday();
+                document.getElementById('ticketsHoy').textContent = stats.ticketsHoy || 0;
+                document.getElementById('totalDOP').textContent = stats.totalDOP || 0;
+                document.getElementById('totalUSD').textContent = stats.totalUSD || 0;
+                document.getElementById('pendientes').textContent = stats.pendientes || 0;
+            } catch (error) {
+                console.error('Error cargando stats:', error);
+                // Mostrar ceros si no hay IPC
+                document.getElementById('ticketsHoy').textContent = 0;
+                document.getElementById('totalDOP').textContent = 0;
+                document.getElementById('totalUSD').textContent = 0;
+                document.getElementById('pendientes').textContent = 0;
+            }
+        }
+
+        async function validateVoucher() {
+            const code = document.getElementById('voucherCode').value.trim();
+            if (!code) {
+                resultDiv.textContent = 'Ingrese un código válido';
+                return;
+            }
+            try {
+                if (!hasIPC()) throw new Error('IPC no disponible');
+                const res = await window.api.validateTicket(code);
+                if (res.valid) {
+                    resultDiv.textContent = 'Voucher válido';
+                    voucherDetailsDiv.innerHTML = `
+                        <p><strong>Código:</strong> ${res.ticket.code}</p>
+                        <p><strong>Monto:</strong> ${res.ticket.amount} ${res.ticket.currency}</p>
+                        <p><strong>Estado:</strong> ${res.ticket.estado}</p>
+                    `;
+                    redeemSection.style.display = 'block';
+                } else {
+                    resultDiv.textContent = res.reason === 'used' ? 'Voucher ya usado' : (res.reason === 'expired' ? 'Voucher expirado' : 'Voucher inválido');
+                    redeemSection.style.display = 'none';
+                }
+            } catch (error) {
+                console.error(error);
+                resultDiv.textContent = 'Error validando voucher. Asegúrese de ejecutar en Electron.';
+                redeemSection.style.display = 'none';
+            }
+        }
+
+        async function redeemVoucher() {
+            const code = document.getElementById('voucherCode').value.trim();
+            if (!code) return;
+            try {
+                if (!hasIPC()) throw new Error('IPC no disponible');
+                const res = await window.api.redeemTicket(code);
+                if (res.success) {
+                    resultDiv.textContent = 'Voucher cobrado exitosamente';
+                    redeemSection.style.display = 'none';
+                    await loadStats();
+                } else {
+                    resultDiv.textContent = `Error: ${res.error || 'No se pudo cobrar'}`;
+                }
+            } catch (error) {
+                console.error(error);
+                resultDiv.textContent = 'Error cobrando voucher. Ejecute en Electron.';
+            }
+        }
+
+        validateBtn.addEventListener('click', validateVoucher);
+        redeemBtn.addEventListener('click', redeemVoucher);
+        cancelBtn.addEventListener('click', () => {
+            redeemSection.style.display = 'none';
+        });
+
+        volverPanelBtn.addEventListener('click', () => {
+            if (window.api && typeof window.api.navigateTo === 'function') {
+                window.api.navigateTo('panel');
+            }
+        });
+
+        salirBtn.addEventListener('click', () => {
+            if (window.api && typeof window.api.exitApp === 'function') {
+                window.api.exitApp();
+            }
+        });
+
+        // Inicializar
+        loadStats();
+    </script>
+</body>
+</html>

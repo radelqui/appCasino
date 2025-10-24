@@ -1,0 +1,396 @@
+SISTEMA DE AUTENTICACIÓN COMPLETO PARA CASINO
+1️⃣ INFORMACIÓN NECESARIA
+Necesito verificar estos detalles de tu implementación actual:
+SQLite (Local):
+
+¿Qué método de hash usas? (bcrypt, SHA256, MD5, texto plano)
+¿La tabla usuarios tiene todos estos campos?: id, username, password_hash, role, active
+¿Cómo validas las credenciales? (comparación directa, bcrypt.compare, etc.)
+¿Qué error exacto recibes al intentar login?
+
+Supabase:
+
+¿Tienes RLS (Row Level Security) habilitado?
+¿Creaste el usuario en auth.users o solo en una tabla pública?
+¿Configuraste las políticas (policies) para el rol admin?
+
+2️⃣ SOLUCIÓN PARA SQLite
+Esquema correcto de base de datos:
+sql-- Crear tabla de usuarios con todos los campos necesarios
+CREATE TABLE IF NOT EXISTS usuarios (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL,
+    role TEXT CHECK(role IN ('admin', 'mesa', 'caja', 'auditoria')) NOT NULL,
+    email TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    last_login DATETIME,
+    active INTEGER DEFAULT 1,
+    metadata TEXT -- JSON para datos adicionales
+);
+
+-- Índices para búsquedas rápidas
+CREATE INDEX IF NOT EXISTS idx_username ON usuarios(username);
+CREATE INDEX IF NOT EXISTS idx_role ON usuarios(role);
+Implementación segura con bcrypt:
+javascript// auth-sqlite.js
+const bcrypt = require('bcryptjs');
+const Database = require('better-sqlite3');
+const path = require('path');
+
+class AuthManager {
+    constructor(dbPath = './casino.db') {
+        this.db = new Database(dbPath);
+        this.initDatabase();
+    }
+
+    initDatabase() {
+        // Crear tabla si no existe
+        this.db.exec(`
+            CREATE TABLE IF NOT EXISTS usuarios (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT UNIQUE NOT NULL,
+                password_hash TEXT NOT NULL,
+                role TEXT NOT NULL,
+                email TEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                active INTEGER DEFAULT 1
+            )
+        `);
+    }
+
+    // Crear usuario administrador
+    async createAdmin(username, password, email = null) {
+        try {
+            // Hash seguro de contraseña
+            const saltRounds = 10;
+            const passwordHash = await bcrypt.hash(password, saltRounds);
+            
+            const stmt = this.db.prepare(`
+                INSERT INTO usuarios (username, password_hash, role, email)
+                VALUES (?, ?, 'admin', ?)
+            `);
+            
+            const result = stmt.run(username, passwordHash, email);
+            
+            console.log('✅ Admin creado:', {
+                id: result.lastInsertRowid,
+                username: username,
+                role: 'admin'
+            });
+            
+            return { success: true, userId: result.lastInsertRowid };
+        } catch (error) {
+            console.error('❌ Error creando admin:', error.message);
+            return { success: false, error: error.message };
+        }
+    }
+
+    // Validar credenciales
+    async validateUser(username, password) {
+        try {
+            const stmt = this.db.prepare(`
+                SELECT * FROM usuarios 
+                WHERE username = ? AND active = 1
+            `);
+            
+            const user = stmt.get(username);
+            
+            if (!user) {
+                console.log('❌ Usuario no encontrado:', username);
+                return { valid: false, reason: 'Usuario no existe' };
+            }
+
+            // Comparar contraseña con hash
+            const passwordMatch = await bcrypt.compare(password, user.password_hash);
+            
+            if (!passwordMatch) {
+                console.log('❌ Contraseña incorrecta para:', username);
+                return { valid: false, reason: 'Contraseña incorrecta' };
+            }
+
+            // Actualizar último login
+            this.db.prepare('UPDATE usuarios SET last_login = CURRENT_TIMESTAMP WHERE id = ?')
+                .run(user.id);
+
+            console.log('✅ Login exitoso:', username, 'Rol:', user.role);
+            
+            return {
+                valid: true,
+                user: {
+                    id: user.id,
+                    username: user.username,
+                    role: user.role,
+                    email: user.email
+                }
+            };
+        } catch (error) {
+            console.error('❌ Error validando:', error);
+            return { valid: false, error: error.message };
+        }
+    }
+
+    // Script de inicialización
+    async initializeAdmin() {
+        // Verificar si ya existe admin
+        const existingAdmin = this.db.prepare(
+            'SELECT COUNT(*) as count FROM usuarios WHERE role = "admin"'
+        ).get();
+
+        if (existingAdmin.count === 0) {
+            // Crear admin por defecto
+            await this.createAdmin('admin', 'Casino2024!', 'admin@coralreef.com');
+            console.log('📝 Usuario admin creado con contraseña: Casino2024!');
+            console.log('⚠️  CAMBIA ESTA CONTRASEÑA INMEDIATAMENTE');
+        } else {
+            console.log('ℹ️  Ya existe un usuario administrador');
+        }
+    }
+}
+
+// Ejecutar si es el archivo principal
+if (require.main === module) {
+    const auth = new AuthManager();
+    
+    // Inicializar admin
+    auth.initializeAdmin().then(() => {
+        // Probar login
+        auth.validateUser('admin', 'Casino2024!').then(result => {
+            console.log('Test login:', result);
+        });
+    });
+}
+
+module.exports = AuthManager;
+3️⃣ SOLUCIÓN PARA SUPABASE
+Configuración en Supabase Dashboard:
+
+Crear tabla de perfiles con roles:
+
+sql-- En SQL Editor de Supabase
+CREATE TABLE public.profiles (
+    id UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
+    username TEXT UNIQUE NOT NULL,
+    role TEXT CHECK(role IN ('admin', 'mesa', 'caja', 'auditoria')) NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Habilitar RLS
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+
+-- Política para admin: acceso total
+CREATE POLICY "Admins have full access" ON public.profiles
+    FOR ALL
+    USING (
+        auth.uid() IN (
+            SELECT id FROM public.profiles WHERE role = 'admin'
+        )
+    );
+
+-- Política para usuarios: solo su perfil
+CREATE POLICY "Users can view own profile" ON public.profiles
+    FOR SELECT
+    USING (auth.uid() = id);
+
+-- Trigger para crear perfil automáticamente
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS trigger AS $$
+BEGIN
+    INSERT INTO public.profiles (id, username, role)
+    VALUES (
+        new.id,
+        new.raw_user_meta_data->>'username',
+        COALESCE(new.raw_user_meta_data->>'role', 'mesa')
+    );
+    RETURN new;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE TRIGGER on_auth_user_created
+    AFTER INSERT ON auth.users
+    FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+Cliente JavaScript para Supabase:
+javascript// auth-supabase.js
+const { createClient } = require('@supabase/supabase-js');
+
+class SupabaseAuth {
+    constructor() {
+        this.supabase = createClient(
+            process.env.SUPABASE_URL,
+            process.env.SUPABASE_ANON_KEY
+        );
+    }
+
+    // Crear usuario administrador
+    async createAdmin(email, password, username) {
+        try {
+            // 1. Crear usuario en auth
+            const { data: authData, error: authError } = await this.supabase.auth.signUp({
+                email: email,
+                password: password,
+                options: {
+                    data: {
+                        username: username,
+                        role: 'admin'
+                    }
+                }
+            });
+
+            if (authError) throw authError;
+
+            // 2. Usar service key para actualizar rol (desde backend seguro)
+            const { data: profile, error: profileError } = await this.supabase
+                .from('profiles')
+                .update({ role: 'admin' })
+                .eq('id', authData.user.id)
+                .single();
+
+            if (profileError) throw profileError;
+
+            console.log('✅ Admin creado en Supabase:', {
+                id: authData.user.id,
+                email: email,
+                username: username
+            });
+
+            return { success: true, user: authData.user };
+        } catch (error) {
+            console.error('❌ Error creando admin en Supabase:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    // Login
+    async login(email, password) {
+        try {
+            const { data, error } = await this.supabase.auth.signInWithPassword({
+                email: email,
+                password: password
+            });
+
+            if (error) throw error;
+
+            // Obtener perfil con rol
+            const { data: profile } = await this.supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', data.user.id)
+                .single();
+
+            console.log('✅ Login exitoso:', {
+                email: email,
+                role: profile?.role,
+                session: data.session ? 'Activa' : 'No activa'
+            });
+
+            return {
+                success: true,
+                user: data.user,
+                profile: profile,
+                session: data.session
+            };
+        } catch (error) {
+            console.error('❌ Error en login:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    // Verificar rol
+    async checkAdminRole(userId) {
+        const { data, error } = await this.supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', userId)
+            .single();
+
+        return data?.role === 'admin';
+    }
+}
+
+module.exports = SupabaseAuth;
+4️⃣ SCRIPT DE INICIALIZACIÓN COMPLETO
+javascript// init-auth.js - Ejecutar una sola vez
+const AuthManager = require('./auth-sqlite');
+const SupabaseAuth = require('./auth-supabase');
+
+async function initializeSystem() {
+    console.log('🚀 Inicializando sistema de autenticación...\n');
+
+    // 1. SQLite local
+    console.log('📦 Configurando SQLite...');
+    const localAuth = new AuthManager('./casino.db');
+    await localAuth.initializeAdmin();
+
+    // 2. Supabase remoto
+    console.log('\n☁️  Configurando Supabase...');
+    const remoteAuth = new SupabaseAuth();
+    
+    // Crear admin en Supabase
+    const result = await remoteAuth.createAdmin(
+        'admin@coralreef.com',
+        'Casino2024!',
+        'admin'
+    );
+
+    if (result.success) {
+        console.log('✅ Admin creado en Supabase');
+    }
+
+    // 3. Probar ambos sistemas
+    console.log('\n🧪 Probando autenticación...\n');
+
+    // Test SQLite
+    console.log('SQLite:');
+    const localTest = await localAuth.validateUser('admin', 'Casino2024!');
+    console.log(localTest.valid ? '✅ Login local funciona' : '❌ Login local falla');
+
+    // Test Supabase
+    console.log('\nSupabase:');
+    const remoteTest = await remoteAuth.login('admin@coralreef.com', 'Casino2024!');
+    console.log(remoteTest.success ? '✅ Login remoto funciona' : '❌ Login remoto falla');
+
+    console.log('\n✨ Sistema inicializado');
+}
+
+// Ejecutar
+initializeSystem().catch(console.error);
+5️⃣ CHECKLIST DE VERIFICACIÓN
+✅ SQLite:
+
+ Tabla usuarios creada con todos los campos
+ Usuario admin insertado correctamente
+ Password hasheado con bcrypt (no texto plano)
+ Login funciona con credenciales correctas
+ Login falla con credenciales incorrectas
+ Campo active en 1 para admin
+
+✅ Supabase:
+
+ Usuario creado en auth.users
+ Perfil creado en public.profiles
+ RLS habilitado en tabla profiles
+ Política para admin configurada
+ Login retorna sesión válida
+ Metadata incluye rol correcto
+
+6️⃣ PREGUNTAS PARA CLAUDE CODE
+Si necesitas ayuda adicional, pregunta:
+
+"¿Cómo debuggear bcrypt.compare que siempre retorna false?"
+"¿Cómo verificar que RLS está funcionando en Supabase?"
+"¿Cómo sincronizar usuarios entre SQLite y Supabase?"
+"¿Cómo implementar refresh tokens para sesiones?"
+"¿Cómo agregar 2FA al sistema de autenticación?"
+
+7️⃣ TROUBLESHOOTING COMÚN
+Problema: "Usuario creado pero no puedo hacer login"
+Causa probable: Hash incorrecto o comparación fallida
+Solución: Verificar que usas el mismo método de hash al crear y validar
+Problema: "Supabase dice 'invalid login credentials'"
+Causa probable: Email no confirmado o RLS bloqueando
+Solución: Verificar email_confirmed_at en auth.users
+Problema: "Role siempre es null"
+Causa probable: Metadata no se guarda correctamente
+Solución: Usar raw_user_meta_data en signup options
+¿Cuál de estos problemas específicos estás experimentando? Con esa información puedo darte una solución más precisa.ReintentarClaude puede cometer errores. Por favor, verifique las respuestas.

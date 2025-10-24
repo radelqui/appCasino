@@ -1,0 +1,19 @@
+{
+  "productName": "Casino Vouchers (Pure)",
+  "appId": "com.coralreef.casinovouchers.pure",
+  "files": [
+    "Electron_Puro/**/*",
+    "Caja/**/*",
+    "pure/**/*",
+    "src/main/**/*",
+    "package.json",
+    "node_modules/**/*"
+  ],
+  "extraMetadata": {
+    "main": "Electron_Puro/main.js"
+  },
+  "win": {
+    "target": ["dir"],
+    "artifactName": "casino-vouchers-pure-${version}-${arch}"
+  }
+}

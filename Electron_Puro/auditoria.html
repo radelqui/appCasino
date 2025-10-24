@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Auditoría</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 24px; background: #0f172a; color: #e2e8f0; }
+    .wrap { max-width: 900px; margin: 0 auto; }
+    header { display:flex; align-items:center; gap:12px; }
+    .back { padding:8px 12px; background:#334155; color:#fff; border:none; border-radius:6px; cursor:pointer; }
+    .card { background:#111827; border:1px solid #1f2937; padding:16px; border-radius:12px; margin-top:16px; }
+    .muted { color:#94a3b8; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <button id="backBtn" class="back">← Volver</button>
+      <h1>Auditoría</h1>
+      <button id="exitBtn" class="back" style="margin-left:auto;">Salir</button>
+    </header>
+    <div class="card">
+      <p class="muted">Placeholder: esta vista requiere rol AUDITOR o ADMIN. Aquí irán reportes, exportaciones y logs.</p>
+    </div>
+  </div>
+  <script>
+    async function checkRole() {
+      let role = 'MESA';
+      try { role = String(await (window.api?.getRole?.() ?? 'MESA')).toUpperCase(); } catch {}
+      if (!(role === 'AUDITOR' || role === 'ADMIN')) {
+        alert('Acceso denegado. Requiere rol AUDITOR/ADMIN.');
+        volver();
+      }
+    }
+    function volver(){
+      try { window.api?.focusPanel?.(); } catch {}
+      try { window.api?.closeCurrent?.(); } catch {}
+      try { window.location.href = '../Caja/panel.html'; } catch {}
+    }
+    function salir(){
+      try { window.api?.closeCurrent?.(); } catch {}
+    }
+    document.getElementById('backBtn')?.addEventListener('click', volver);
+    document.getElementById('exitBtn')?.addEventListener('click', salir);
+    checkRole();
+  </script>
+</body>
+</html>

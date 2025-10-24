@@ -1,0 +1,29 @@
+{
+  "productName": "Casino Vouchers",
+  "directories": {
+    "output": "dist"
+  },
+  "win": {
+    "target": ["portable"],
+    "icon": "assets/icon.ico",
+    "requestedExecutionLevel": "asInvoker"
+  },
+  "portable": {
+    "artifactName": "CasinoVouchers.exe",
+    "requestExecutionLevel": "user",
+    "unpackDirName": "casino-data"
+  },
+  "files": [
+    "build/**/*",
+    "src/main/**/*",
+    "node_modules/**/*",
+    "!node_modules/**/test/**",
+    "!node_modules/**/*.md",
+    "!**/*.map"
+  ],
+  "compression": "maximum",
+  "nsis": {
+    "oneClick": true,
+    "perMachine": false
+  }
+}

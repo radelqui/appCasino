@@ -1,0 +1,90 @@
+anning Supabase integration
+
+I need to respond in Spanish since the user’s input is in Spanish. They mentioned that validations should be handled via Supabase, not local SQLite, so they want to switch the login validations.
+
+I'll need to propose a plan that involves integrating the Supabase client, using environment variables, and implementing Supabase auth or RPC. It's important to ensure a secure flow, set up the necessary tables like operadores, tickets, and roles, and carefully manage the service role key. Updating authentication to Supabase
+
+I need to modify the code to incorporate Supabase authentication. The user seems to prefer using email/password or a code and PIN setup, and they want validations via Supabase, likely just for login.
+
+I should implement a simple query to fetch users while being cautious about security, since storing PINs in plaintext isn’t ideal. Hashing with bcrypt on the local side or storing hashes and comparing them in Postgres would be better. I’ll also propose using Row Level Security (RLS) with appropriate policies for secure access, and set up the Supabase client using environment variables. Designing authentication flow
+
+Since this is a desktop app, I need to avoid using the service key in the renderer. Instead, I can use the anonymous key along with RLS, though trusting the renderer isn’t ideal since users can inspect it. It’s better to perform validation in the main process using the service role or an external API server. The user wants to use Supabase, so I’ll create a new module for Supabase queries and modify existing handlers for authentication. Implementing these changes will enhance security. Implementing Supabase validation
+
+The developer instructions indicate that for multi-step tasks, I should use a to-do list and mark tasks as completed. Our UI already has an integrated login, but now I need to redirect the backend to Supabase for validation.
+
+This involves modifying the code to add a Supabase client file, install the necessary dependency, and update the relevant handlers. I'll ensure to run the command in an available terminal to install the Supabase library and create the client file for easy reusability. I'll keep everything organized within the application structure. Creating Supabase client and handling login
+
+I’m going to create a``supabaseClient.js`` file at the app's root and import it into``Caja\cajaHandlers.js`` . I'll set up the Supabase client with necessary credentials. While I'm aware that the service role key shouldn't be exposed in insecure contexts, for Node.js, it’s acceptable.
+
+The authentication logic will include a function to log in an operator and log that event in the audit logs. Since table names may differ between the local DB and Supabase, I'll assume similar names and keep a fallback. I’ll also add a configuration switch based on the``USE_SUPABASE`` variable and implement these changes without breaking existing functionality. Finally, I’ll ensure the proper environment variables are set up and install the necessary Supabase dependency.
+
+Voy a instalar el cliente de Supabase, crear un módulo de cliente y actualizar el handler de login para usar Supabase con un flag.
+
+appCasino Terminal
+
+npm install @supabase/supabase-js
+
+supabaseClient.js
+
++ 45 - 0
+
+Open Diff
+
+Caja\cajaHandlers.js
+
++ 1 - 0
+
+Open Diff
+
+Caja\cajaHandlers.js
+
++ 8 - 2
+
+Open Diff
+
+4/4 done
+
+All tasks completed
+
+Instalar @supabase/supabase-js en el proyecto
+
+Crear módulo supabaseClient.js con loginOperatorSupabase
+
+Actualizar cajaHandlers para usar Supabase con bandera USE_SUPABASE
+
+Verificar panel de Caja en preview; modal sigue funcionando
+
+Perfecto, migré el login de Caja para que las validaciones puedan hacerse vía Supabase, manteniendo un fallback a SQLite por si quieres operar offline.
+
+Qué cambié
+
+- Dependencia: instalé @supabase/supabase-js en c:\appCasino .
+- Cliente Supabase: añadí c:\appCasino\supabaseClient.js que:
+  - Inicializa el cliente con SUPABASE_URL y una clave ( SUPABASE_SERVICE_ROLE_KEY o SUPABASE_ANON_KEY ).
+  - Expone loginOperatorSupabase(codigo, pin) que consulta la tabla operadores y registra un log en audit_logs si el login es válido.
+- Handler IPC: modifiqué c:\appCasino\Caja\cajaHandlers.js para que caja:login use Supabase si USE_SUPABASE=true ; si no, usa el método local authenticateOperator del SQLite.
+- UI: el modal de login de c:\appCasino\Caja\panel.html sigue igual; ahora, si el flag está activo, valida contra Supabase.
+Cómo activarlo
+
+- Crea o edita .env en c:\appCasino con:
+  - USE_SUPABASE=true
+  - SUPABASE_URL=... (tu URL de proyecto)
+  - SUPABASE_SERVICE_ROLE_KEY=... (recomendado en proceso principal) o SUPABASE_ANON_KEY=...
+- Asegúrate de cargar esas variables al arrancar la app (por ejemplo, usando dotenv en tu main.js si ya lo tienes, o configurándolas en el entorno de ejecución).
+- Esquema esperado en Supabase:
+  - Tabla operadores : columnas id , codigo , nombre , mesa_asignada , pin (idealmente hasheado), activo (boolean).
+  - Tabla audit_logs opcional para trazas: tipo_evento , usuario_id , descripcion , datos_adicionales , created_at .
+Recomendaciones de seguridad
+
+- No guardes el PIN en texto plano. Lo óptimo:
+  - Hashea el pin y verifica vía una función SQL/RPC ( authenticate_operator(codigo, pin_plain) ), que compare con crypt() en Postgres.
+  - Usa RLS y políticas restrictivas; si necesitas más control, usa una Edge Function para el login y devuelve solo campos permitidos.
+- Mantén la SERVICE_ROLE_KEY únicamente en el proceso principal de Electron, nunca en el renderer.
+Siguientes pasos opcionales
+
+- Implementar login de Auditoría vía Supabase:
+  - Añadir auditoria:login con Supabase (tabla auditores o usuarios con roles).
+  - Exponer loginAuditoria en el bridge.
+  - Agregar modal similar en panel.html para Auditoría.
+- Migrar más operaciones de Caja (validación/cobro/estadísticas) a Supabase con RLS.
+Si me pasas tus credenciales de proyecto y confirmas el esquema de tablas, configuro las políticas RLS y, si quieres, te preparo la función

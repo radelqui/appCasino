@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sistema TITO Casino</title>
+  <style>
+    body{font-family:Roboto,Segoe UI,Arial,sans-serif;background:#0b1f24;color:#e6f7f9;margin:0}
+    header{background:#0e2a31;padding:12px 16px;display:flex;align-items:center;justify-content:space-between}
+    h1{font-size:18px;margin:0}
+    .container{padding:16px;display:flex;gap:16px}
+    .panel{background:#0e2a31;border:1px solid #14424b;border-radius:8px;padding:16px;flex:1}
+    label{display:block;margin:8px 0 4px}
+    input,select,button{padding:8px 10px;border-radius:6px;border:1px solid #1a4f59;background:#0b1f24;color:#e6f7f9;width:100%}
+    button{cursor:pointer;background:#16a3b5;border-color:#16a3b5;color:#042126;font-weight:600}
+    button:disabled{opacity:.5;cursor:not-allowed}
+    .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .tabs{display:flex;gap:8px;margin-bottom:12px}
+    .tab{padding:8px 12px;border:1px solid #1a4f59;border-radius:999px;cursor:pointer}
+    .tab.active{background:#16a3b5;color:#042126;border-color:#16a3b5}
+    .hidden{display:none}
+    pre{white-space:pre-wrap;background:#071419;border-radius:6px;padding:8px;border:1px solid #12333a}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Coral Reef Casino — Sistema TITO</h1>
+    <div id="status">Conectado</div>
+  </header>
+  <div class="container">
+    <div class="panel" style="max-width:420px">
+      <div class="tabs">
+        <div class="tab active" data-tab="mesa">Mesa</div>
+        <div class="tab" data-tab="caja">Caja</div>
+        <div class="tab" data-tab="audit">Auditoría</div>
+      </div>
+      <div id="view-mesa">
+        <div class="row">
+          <div>
+            <label>Moneda</label>
+            <select id="moneda">
+              <option value="DOP">DOP</option>
+              <option value="USD">USD</option>
+            </select>
+          </div>
+          <div>
+            <label>Mesa</label>
+            <input id="mesa" placeholder="Ej: M-01" />
+          </div>
+        </div>
+        <label>Monto</label>
+        <input id="monto" type="number" min="1" step="0.01" />
+        <label>Operador (PIN)</label>
+        <input id="operador" placeholder="PIN/Usuario" />
+        <button id="btn-generar" style="margin-top:12px">Generar ticket</button>
+        <pre id="out-mesa"></pre>
+      </div>
+
+      <div id="view-caja" class="hidden">
+        <label>Escanear/pegar QR</label>
+        <input id="qr-input" placeholder="Pegar string del QR" />
+        <button id="btn-validar" style="margin-top:12px">Validar</button>
+        <div class="row">
+          <button id="btn-pagar">Confirmar pago</button>
+          <button id="btn-reimprimir">Reimprimir</button>
+        </div>
+        <pre id="out-caja"></pre>
+      </div>
+
+      <div id="view-audit" class="hidden">
+        <label>Rango (ISO)</label>
+        <div class="row">
+          <input id="fecha-desde" placeholder="YYYY-MM-DD" />
+          <input id="fecha-hasta" placeholder="YYYY-MM-DD" />
+        </div>
+        <div class="row" style="margin-top:8px">
+          <button id="btn-stats">Cargar estadísticas</button>
+          <button id="btn-sync">Sync manual</button>
+        </div>
+        <pre id="out-audit"></pre>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3>Configuración de Impresión</h3>
+      <label>Modo</label>
+      <select id="print-mode">
+        <option value="PDF">PDF (Spooler Windows)</option>
+        <option value="ESCPOS">ESC/POS (Térmica)</option>
+      </select>
+      <div class="row" style="margin-top:8px">
+        <button id="btn-test-print">Probar Impresión</button>
+        <button id="btn-test-cal">Probar Calibración</button>
+      </div>
+      <p style="margin-top:8px;color:#8fcfd6;font-size:12px">
+        Nota: En esta vista previa estática, los botones sólo registran eventos.
+        En la app Electron real, ejecutan la impresora con el modo seleccionado.
+      </p>
+    </div>
+
+    <div class="panel">
+      <h3>Log</h3>
+      <pre id="log"></pre>
+    </div>
+  </div>
+  <script>
+    const logEl = document.getElementById('log');
+    function log(msg){ logEl.textContent += (msg + "\n"); logEl.scrollTop = logEl.scrollHeight; }
+
+    const tabs = document.querySelectorAll('.tab');
+    const views = { mesa: 'view-mesa', caja: 'view-caja', audit: 'view-audit' };
+    tabs.forEach(t => t.addEventListener('click', () => {
+      tabs.forEach(x => x.classList.remove('active')); t.classList.add('active');
+      Object.values(views).forEach(id => document.getElementById(id).classList.add('hidden'));
+      document.getElementById(views[t.dataset.tab]).classList.remove('hidden');
+    }));
+
+    document.getElementById('btn-generar').onclick = async () => {
+      try {
+        const valor = parseFloat(document.getElementById('monto').value);
+        const moneda = document.getElementById('moneda').value;
+        const mesa_id = document.getElementById('mesa').value;
+        const usuario_emision = document.getElementById('operador').value;
+        const res = await window.api.generateTicket({ valor, moneda, mesa_id, usuario_emision });
+        document.getElementById('out-mesa').textContent = JSON.stringify(res, null, 2);
+        log('Ticket generado: ' + res.ticket_number);
+      } catch (e) { log('Error: ' + e.message); }
+    };
+
+    document.getElementById('btn-validar').onclick = async () => {
+      try {
+        const qr = document.getElementById('qr-input').value.trim();
+        const res = await window.api.validateTicket(qr);
+        document.getElementById('out-caja').textContent = JSON.stringify(res, null, 2);
+        log('Validación OK: ' + (res.ticket?.ticket_number || res.ticket?.id));
+      } catch (e) { log('Error: ' + e.message); }
+    };
+
+    document.getElementById('btn-pagar').onclick = async () => {
+      try {
+        const out = document.getElementById('out-caja').textContent;
+        const parsed = out ? JSON.parse(out) : null;
+        const ticket_number = parsed?.ticket?.ticket_number || parsed?.ticket?.id;
+        if (!ticket_number) throw new Error('Valide un ticket primero');
+        const res = await window.api.processPayment({ ticket_number, usuario_canje: 'CAJERO' });
+        log('Pago: ' + JSON.stringify(res));
+      } catch (e) { log('Error: ' + e.message); }
+    };
+
+    document.getElementById('btn-reimprimir').onclick = async () => {
+      try {
+        const out = document.getElementById('out-caja').textContent;
+        const parsed = out ? JSON.parse(out) : null;
+        const ticket_number = parsed?.ticket?.ticket_number || parsed?.ticket?.id;
+        if (!ticket_number) throw new Error('Valide un ticket primero');
+        // Para MVP, regeneramos un PDF desde datos mínimos.
+        log('Reimpresión solicitada para ' + ticket_number);
+      } catch (e) { log('Error: ' + e.message); }
+    };
+
+    document.getElementById('btn-stats').onclick = async () => {
+      try {
+        const dateFrom = document.getElementById('fecha-desde').value;
+        const dateTo = document.getElementById('fecha-hasta').value;
+        const res = await window.api.getStats({ dateFrom, dateTo });
+        document.getElementById('out-audit').textContent = JSON.stringify(res, null, 2);
+        log('Stats cargadas');
+      } catch (e) { log('Error: ' + e.message); }
+    };
+
+    document.getElementById('btn-sync').onclick = async () => {
+      try { const res = await window.api.forceSync(); log('Sync: ' + JSON.stringify(res)); }
+      catch (e) { log('Error: ' + e.message); }
+    };
+
+    if (window.api?.onQrScanned) {
+      window.api.onQrScanned(code => {
+        document.getElementById('qr-input').value = code;
+        log('Escaneado: ' + code);
+      });
+    }
+
+    // Configuración (vista previa)
+    const pm = document.getElementById('print-mode');
+    pm.addEventListener('change', () => {
+      log('[Preview] Modo seleccionado: ' + pm.value);
+    });
+    document.getElementById('btn-test-print').onclick = () => {
+      log('[Preview] Probar impresión (' + pm.value + ')');
+    };
+    document.getElementById('btn-test-cal').onclick = () => {
+      log('[Preview] Probar calibración (' + pm.value + ')');
+    };
+  </script>
+</body>
+</html>

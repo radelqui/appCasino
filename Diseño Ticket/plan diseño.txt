@@ -1,0 +1,40 @@
+Plan de Implementación Recomendado:
+
+Semana 1-2: Diseño del Ticket
+
+Replicar el estilo de los tickets de referencia
+
+Integrar logo Coral Reef Casino
+
+USD (verde) vs DOP (azul)
+
+Código QR + código de barras
+
+Semana 3-4: App Windows Básica
+
+Interfaz operador (generar vouchers)
+
+Interfaz caja (validar vouchers)
+
+Base de datos SQLite local
+
+Semana 5-6: Sistema Completo
+
+Panel auditoría web
+
+Sincronización entre equipos Windows
+
+Reportes y exportación
+
+🎫 Ticket Design usando tu referencia:
+
+🏛️ GRAN CASINO SOSÚA - CORAL REEF
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CASHOUT VOUCHER
+[QR Code] [Barcode]
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+VALIDATION: DD/MM/YYYY HH:MM
+TICKET # XXXX
+QUINIENTOS PESOS DOMINICANOS
+$500.00 DOP
+VOID AFTER 365 DAYS - MACHINE# XXX

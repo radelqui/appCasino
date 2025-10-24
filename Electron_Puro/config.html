@@ -1,0 +1,344 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Configuración</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 24px; background: #0f172a; color: #e2e8f0; }
+    .wrap { max-width: 900px; margin: 0 auto; }
+    header { display:flex; align-items:center; gap:12px; }
+    .back { padding:8px 12px; background:#334155; color:#fff; border:none; border-radius:6px; cursor:pointer; }
+    .card { background:#111827; border:1px solid #1f2937; padding:16px; border-radius:12px; margin-top:16px; }
+    .muted { color:#94a3b8; }
+    .grid { display:grid; grid-template-columns: 1fr 1fr; gap:12px; }
+    .field label { display:block; font-size:14px; color:#a1a1aa; margin-bottom:6px; }
+    .field input, .field select { width:100%; padding:8px 10px; border-radius:8px; border:1px solid #374151; background:#0b1324; color:#fff; }
+    .toggle { display:flex; align-items:center; gap:12px; }
+    .toggle input { width:18px; height:18px; }
+    /* Toast simple */
+    .toast { position: fixed; bottom: 20px; right: 20px; padding: 10px 14px; border-radius: 8px; background: #10b981; color: #0b1324; box-shadow: 0 8px 20px rgba(0,0,0,0.3); font-size: 14px; display:none; }
+    .toast.error { background: #ef4444; color: #fff; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <button class="back" onclick="volver()">← Volver</button>
+      <h1>Configuración</h1>
+    </header>
+    <div class="card">
+      <p class="muted">Esta vista requiere rol ADMIN. Aquí puedes ajustar perfiles de impresión y habilitar la Caja.</p>
+      <div class="grid" style="margin-top:16px;">
+        <div class="field">
+          <label>Perfil de impresión</label>
+          <select id="perfil">
+            <option value="PDF">PDF</option>
+            <option value="ESCPOS">ESCPOS</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Nombre de impresora</label>
+          <input id="printerName" placeholder="EPSON TM-T20" />
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:12px;">
+        <h3 style="margin:0 0 8px 0;">Caja</h3>
+        <div class="toggle">
+          <label for="cajaEnabled">Habilitar Caja (permite abrir la ventana de Caja)</label>
+          <input type="checkbox" id="cajaEnabled" />
+        </div>
+        <div style="margin-top:12px; display:flex; gap:10px;">
+          <button class="back" onclick="guardarCaja()">Guardar Caja</button>
+          <button class="back" onclick="crearOperadorDemo()">Crear operador demo</button>
+        </div>
+        <p class="muted" style="margin-top:8px;">Nota: si la Caja no está habilitada y no existe operador activo, la ventana de Caja quedará inaccesible.</p>
+      </div>
+
+      <!-- Selector de Rol -->
+      <div class="card" style="margin-top:12px;">
+        <h3 style="margin:0 0 8px 0;">Rol</h3>
+        <div class="grid" style="grid-template-columns: 1fr;">
+          <div class="field">
+            <label for="rolSelect">Rol actual</label>
+            <select id="rolSelect">
+              <option value="ADMIN">ADMIN</option>
+              <option value="MESA">MESA</option>
+              <option value="CAJA">CAJA</option>
+              <option value="AUDITOR">AUDITOR</option>
+            </select>
+          </div>
+        </div>
+        <div style="margin-top:12px; display:flex; gap:10px;">
+          <button class="back" onclick="guardarRol()">Guardar Rol</button>
+        </div>
+        <p class="muted" style="margin-top:8px;">El rol controla acceso a MESA, CAJA, AUDITORÍA y CONFIG.</p>
+      </div>
+
++      <!-- Gestión de Usuarios -->
++      <div class="card" style="margin-top:12px;">
++        <h3 style="margin:0 0 12px 0;">Usuarios (Login general)</h3>
++        <div class="grid">
++          <div class="field">
++            <label>Usuario (email o nombre)</label>
++            <input id="userUsername" placeholder="usuario@casino" />
++          </div>
++          <div class="field">
++            <label>Contraseña</label>
++            <input id="userPassword" type="password" placeholder="mínimo 6 caracteres" />
++          </div>
++          <div class="field">
++            <label>Rol</label>
++            <select id="userRole">
++              <option value="MESA">MESA</option>
++              <option value="CAJA">CAJA</option>
++              <option value="AUDITOR">AUDITOR</option>
++              <option value="ADMIN">ADMIN</option>
++            </select>
++          </div>
++        </div>
++        <div style="margin-top:12px; display:flex; gap:10px;">
++          <button class="back" onclick="createUserSubmit()">Crear usuario</button>
++          <button class="back" onclick="loadUsers()">Actualizar listado</button>
++        </div>
++
++        <div style="margin-top:12px;">
++          <table id="usersTable" style="width:100%; border-collapse: collapse;">
++            <thead>
++              <tr style="text-align:left; border-bottom:1px solid #1f2937;">
++                <th style="padding:8px;">Usuario</th>
++                <th style="padding:8px;">Rol</th>
++                <th style="padding:8px;">Activo</th>
++                <th style="padding:8px;">Acciones</th>
++              </tr>
++            </thead>
++            <tbody id="usersTbody"></tbody>
++          </table>
++        </div>
++        <p class="muted" style="margin-top:8px;">Los usuarios se guardan en la base local SQLite. Si Supabase falla, se usa modo local.</p>
++      </div>
+
+      <div style="margin-top:16px; display:flex; gap:10px;">
+        <button class="back" onclick="guardar()">Guardar</button>
+        <button class="back" onclick="probar()">Probar impresión</button>
+      </div>
+    </div>
+  </div>
+  <div id="toast" class="toast"></div>
+  <script>
+    async function checkRole() {
+      let role = 'MESA';
+      try { role = String(await (window.api?.getRole?.() ?? 'MESA')).toUpperCase(); } catch {}
+      if (role !== 'ADMIN') {
+        alert('Acceso denegado. Requiere rol ADMIN.');
+        volver();
+      }
+    }
+    function volver(){
+      // Pedimos al main volver al panel
+      try { window.api?.openView?.('panel'); } catch { window.location.href = '../Caja/panel.html'; }
+    }
+    async function guardar(){
+      const btn = document.querySelector('button[onclick="guardar()"]');
+      try {
+        if (btn) { btn.disabled = true; btn.textContent = 'Guardando...'; }
+        const profile = { type: document.getElementById('perfil').value, name: document.getElementById('printerName').value };
+        await window.api?.setPrintProfile?.(profile);
+        showToast('Perfil de impresión guardado');
+      } catch(e){
+        showToast('Error guardando perfil: ' + (e?.message || e), 'error');
+      } finally {
+        if (btn) { btn.disabled = false; btn.textContent = 'Guardar'; }
+      }
+    }
+    async function probar(){
+      const btn = document.querySelector('button[onclick="probar()"]');
+      try {
+        if (btn) { btn.disabled = true; btn.textContent = 'Probando...'; }
+        await window.api?.testPrinter?.();
+        showToast('Prueba de impresión enviada');
+      } catch(e){
+        showToast('Error al probar impresión: ' + (e?.message || e), 'error');
+      } finally {
+        if (btn) { btn.disabled = false; btn.textContent = 'Probar impresión'; }
+      }
+    }
+
+    async function init(){
+      try {
+        const p = await window.api?.getPrintProfile?.();
+        if (p) {
+          document.getElementById('perfil').value = (p.type||'PDF');
+          document.getElementById('printerName').value = (p.name||'');
+        }
+      } catch {}
+
+      // Inicializar estado de Caja
+      try {
+        const enabled = await window.api?.getCajaEnabled?.();
+        document.getElementById('cajaEnabled').checked = !!enabled;
+      } catch(err){ console.warn('No se pudo leer estado de Caja:', err); }
+
+      // Inicializar rol actual
+      try {
+        const currentRole = await window.api?.getRole?.();
+        const roleVal = String(currentRole || 'ADMIN').toUpperCase();
+        const sel = document.getElementById('rolSelect');
+        if (sel) sel.value = roleVal;
+      } catch(err){ console.warn('No se pudo leer rol actual:', err); }
+    }
+
+    async function guardarCaja(){
+      try {
+        const btn = document.querySelector('button[onclick="guardarCaja()"]');
+        if (btn) { btn.disabled = true; btn.textContent = 'Guardando...'; }
+        const enabled = document.getElementById('cajaEnabled').checked;
+        const res = await window.api?.setCajaEnabled?.(enabled);
+        if (res && res.success) {
+          showToast('Caja ' + (enabled ? 'habilitada' : 'deshabilitada'));
+        } else {
+          showToast('Error guardando estado de Caja', 'error');
+        }
+      } catch(e){
+        showToast('Error: '+ (e?.message || e), 'error');
+      } finally {
+        const btn = document.querySelector('button[onclick="guardarCaja()"]');
+        if (btn) { btn.disabled = false; btn.textContent = 'Guardar Caja'; }
+      }
+    }
+
+    async function guardarRol(){
+      try {
+        const btn = document.querySelector('button[onclick="guardarRol()"]');
+        if (btn) { btn.disabled = true; btn.textContent = 'Guardando...'; }
+        const val = document.getElementById('rolSelect').value;
+        const r = await window.api?.setRole?.(val);
+        showToast('Rol guardado: ' + r);
+      } catch(e){
+        showToast('Error guardando rol: ' + (e?.message || e), 'error');
+      } finally {
+        const btn = document.querySelector('button[onclick="guardarRol()"]');
+        if (btn) { btn.disabled = false; btn.textContent = 'Guardar Rol'; }
+      }
+    }
+
+    // Crear un operador demo en la base de Caja para desbloquear rápido (dev helper)
+    async function crearOperadorDemo(){
+      try {
+        // Llamamos a un endpoint de syncHandlers si existe, si no mostramos instrucciones
+        if (window.api?.generateOperatorDemo) {
+          await window.api.generateOperatorDemo();
+          alert('Operador demo creado. Ahora la Caja debería abrir.');
+        } else {
+          alert('Para crear un operador demo, ejecute manualmente: agregar una fila en la tabla operadores de Caja/data/casino.db con activo=1.');
+        }
+      } catch(e){ alert('Error creando operador demo: '+ e?.message); }
+    }
+
++    // --- Gestión de usuarios: funciones ---
++    async function loadUsers(){
++      try {
++        const res = await window.api?.listUsers?.();
++        if (!res?.success) throw new Error(res?.error || 'No se pudo listar');
++        renderUsers(res.users || []);
++      } catch(e){ showToast('Error listando usuarios: '+ (e?.message||e), 'error'); }
++    }
++
++    function renderUsers(users){
++      const tb = document.getElementById('usersTbody');
++      if (!tb) return;
++      tb.innerHTML = '';
++      users.forEach(u => {
++        const tr = document.createElement('tr');
++        tr.innerHTML = `
++          <td style="padding:8px;">${u.username}</td>
++          <td style="padding:8px;">
++            <select onchange="changeRole(${u.id}, this.value)" style="background:#0b1324;color:#fff;border:1px solid #374151;border-radius:6px;padding:4px;">
++              <option ${u.role==='MESA'?'selected':''} value="MESA">MESA</option>
++              <option ${u.role==='CAJA'?'selected':''} value="CAJA">CAJA</option>
++              <option ${u.role==='AUDITOR'?'selected':''} value="AUDITOR">AUDITOR</option>
++              <option ${u.role==='ADMIN'?'selected':''} value="ADMIN">ADMIN</option>
++            </select>
++          </td>
++          <td style="padding:8px;">
++            <input type="checkbox" ${u.activo? 'checked':''} onchange="toggleActive(${u.id}, this.checked)" />
++          </td>
++          <td style="padding:8px; display:flex; gap:8px;">
++            <button class="back" onclick="promptResetPassword(${u.id}, '${u.username}')">Contraseña</button>
++            <button class="back" onclick="deleteUser(${u.id})">Eliminar</button>
++          </td>
++        `;
++        tb.appendChild(tr);
++      });
++    }
++
++    async function createUserSubmit(){
++      const username = document.getElementById('userUsername').value.trim();
++      const password = document.getElementById('userPassword').value;
++      const role = document.getElementById('userRole').value;
++      if (!username || !password || password.length < 6){
++        showToast('Complete usuario y contraseña válida (≥6).', 'error');
++        return;
++      }
++      try {
++        const res = await window.api?.createUser?.({ username, password, role, activo: 1 });
++        if (!res?.success) throw new Error(res?.error || 'No se pudo crear');
++        showToast('Usuario creado');
++        document.getElementById('userPassword').value = '';
++        loadUsers();
++      } catch(e){ showToast('Error creando: '+ (e?.message||e), 'error'); }
++    }
++
++    async function toggleActive(id, active){
++      try {
++        const res = await window.api?.setUserActive?.(id, !!active);
++        if (!res?.success) throw new Error(res?.error || 'No se pudo actualizar');
++        showToast('Estado actualizado');
++      } catch(e){ showToast('Error actualizando estado: '+ (e?.message||e), 'error'); }
++    }
++
++    async function changeRole(id, role){
++      try {
++        const res = await window.api?.setUserRole?.(id, role);
++        if (!res?.success) throw new Error(res?.error || 'No se pudo cambiar rol');
++        showToast('Rol actualizado');
++      } catch(e){ showToast('Error cambiando rol: '+ (e?.message||e), 'error'); }
++    }
++
++    async function promptResetPassword(id, username){
++      const pwd = prompt('Nueva contraseña para '+ username +': (mínimo 6)');
++      if (!pwd || pwd.length < 6) return;
++      try {
++        const res = await window.api?.setUserPassword?.(id, pwd);
++        if (!res?.success) throw new Error(res?.error || 'No se pudo cambiar contraseña');
++        showToast('Contraseña actualizada');
++      } catch(e){ showToast('Error cambiando contraseña: '+ (e?.message||e), 'error'); }
++    }
++
++    async function deleteUser(id){
++      if (!confirm('¿Eliminar usuario?')) return;
++      try {
++        const res = await window.api?.deleteUser?.(id);
++        if (!res?.success) throw new Error(res?.error || 'No se pudo eliminar');
++        showToast('Usuario eliminado');
++        loadUsers();
++      } catch(e){ showToast('Error eliminando: '+ (e?.message||e), 'error'); }
++    }
++
+    checkRole();
+    init();
++    loadUsers();
+
+    function showToast(msg, type){
+      const el = document.getElementById('toast');
+      if (!el) return;
+      el.textContent = msg;
+      el.classList.toggle('error', type === 'error');
+      el.style.display = 'block';
+      clearTimeout(window.__toastTimer);
+      window.__toastTimer = setTimeout(() => { el.style.display = 'none'; }, 2500);
+    }
+  </script>
+</body>
+</html>
