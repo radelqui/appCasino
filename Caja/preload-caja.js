@@ -4,8 +4,11 @@ const { contextBridge, ipcRenderer } = require('electron');
 // Exponer APIs seguras al renderer
 contextBridge.exposeInMainWorld('api', {
     // Validación y cobro
-    validateTicket: (code) => ipcRenderer.invoke('caja:validate-ticket', code),
-    validateTicketByCode: (code) => ipcRenderer.invoke('caja:validate-ticket', code),
+        validateTicket: (code) => ipcRenderer.invoke('caja:validate-ticket', code),
+        validateVoucher: (code) => ipcRenderer.invoke('caja:validate-voucher', code),
+        listVouchers: () => ipcRenderer.invoke('list-vouchers'),
+    // Canje genérico de voucher (handler global)
+    redeemVoucher: (code) => ipcRenderer.invoke('redeem-voucher', code),
     redeemTicket: (code, cajeroId) => ipcRenderer.invoke('caja:redeem-ticket', code, cajeroId),
     cancelTicket: (code, razon) => ipcRenderer.invoke('caja:cancel-ticket', code, razon),
     
@@ -26,10 +29,23 @@ contextBridge.exposeInMainWorld('api', {
 
     // --- Roles ---
     getRole: () => ipcRenderer.invoke('get-role'),
+
+    // --- Autenticación global de la app ---
+    getSession: () => ipcRenderer.invoke('auth:get-session'),
+    login: (credentials) => ipcRenderer.invoke('auth:login', credentials),
+    // Compat: panel.html usa loginApp(username, password)
+    loginApp: (username, password) => ipcRenderer.invoke('auth:login', { username, password }),
+    logout: () => ipcRenderer.invoke('auth:logout'),
     
     // Eventos en tiempo real
     onTicketUpdate: (callback) => {
         ipcRenderer.on('caja:ticket-updated', callback);
         return () => ipcRenderer.removeListener('caja:ticket-updated', callback);
-    }
-});
+    },
+
+    // --- Navegación y control de ventana usados por Caja ---
+    navigateTo: (view) => ipcRenderer.invoke('open-view', view),
+    focusPanel: () => ipcRenderer.invoke('focus-panel'),
+    closeCurrent: () => ipcRenderer.invoke('close-current'),
+    exitApp: () => ipcRenderer.invoke('close-current')
+});

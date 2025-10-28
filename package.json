@@ -2,7 +2,7 @@
   "name": "tito-casino-system",
   "version": "1.0.0",
   "description": "Sistema TITO para casino pequeño - Ticket In Ticket Out",
-  "main": "src/main/main.js",
+  "main": "pure/main.js",
   "scripts": {
     "start": "electron .",
     "react-start": "react-scripts start",
@@ -13,7 +13,7 @@
     "build:win": "npm run react-build && electron-builder --win",
     "build:portable": "npm run react-build && electron-builder --config electron-builder.portable.json --win portable",
     "start:prod": "npm run react-build && electron .",
-    "start:pure": "electron ./Electron_Puro/main.js",
+    "start:pure": "electron ./pure/main.js",
     "build:pure:dir": "electron-builder --config electron-builder.pure.json --win dir",
     "build:pure:portable": "electron-builder --config electron-builder.pure.json --win portable",
     "build:mac": "npm run react-build && electron-builder --mac",

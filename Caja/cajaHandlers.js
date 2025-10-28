@@ -36,8 +36,8 @@ function migrateLegacyTicketsOnce() {
                     const currency = r.currency || r.moneda || 'DOP';
                     const estado = (r.estado || r.status || 'activo').toLowerCase();
                     const mesa = r.mesa || r.table || r.pos || 'P01';
-                    const fecha = r.fecha || r.created_at || r.createdAt || new Date().toISOString();
-                    try { db.createTicket(code, amount, currency, mesa, fecha); } catch (_) {}
+                    const stationNumber = (() => { try { return parseInt(String(mesa).replace(/\D/g, '')) || 1; } catch { return 1; } })();
+                    try { db.createVoucher(amount, currency, 'LEGACY', stationNumber, null); } catch (_) {}
                     if (estado === 'usado' || estado === 'redeemed' || estado === 'pagado') {
                         try { db.updateTicketStatus(code, 'usado'); } catch (_) {}
                     }
@@ -57,19 +57,121 @@ migrateLegacyTicketsOnce();
 // Registrar manejadores IPC
 function registerCajaHandlers() {
     
-    // Validar ticket
+    // Validar ticket/voucher por código humano (PREV-XXXXXX)
     ipcMain.handle('caja:validate-ticket', async (event, code) => {
         console.log('Validando ticket:', code);
         try {
-            const result = db.validateTicket(code);
-            return result;
+            const normalized = String(code || '').toUpperCase().trim();
+            // Primero intentar vía mapping de voucher
+            const voucher = (typeof db.getVoucherByCode === 'function') ? db.getVoucherByCode(normalized) : null;
+            if (!voucher) {
+                const v = db.validateTicket(normalized);
+                if (!v.valid) {
+                    return { success: false, error: v.reason || 'Voucher no encontrado', message: 'Voucher no encontrado', valid: false };
+                }
+                return { success: true, estado: v.ticket.estado, ticket: v.ticket };
+            }
+
+            if (voucher.status !== 'active') {
+                const estado = voucher.status === 'redeemed' ? 'canjeado' : (voucher.status === 'expired' ? 'expirado' : voucher.status);
+                return { success: false, error: `Voucher ${estado === 'canjeado' ? 'ya fue usado' : 'no válido'}`, valid: false, estado, voucher };
+            }
+
+            if (voucher.expires_at && new Date(voucher.expires_at) < new Date()) {
+                return { success: false, error: 'Voucher expirado', valid: false, estado: 'expirado', voucher };
+            }
+
+            return {
+                success: true,
+                valid: true,
+                estado: 'emitido',
+                voucher: {
+                    code: voucher.voucher_code,
+                    amount: voucher.amount,
+                    currency: voucher.currency,
+                    issued_at: voucher.issued_at,
+                    status: voucher.status
+                }
+            };
         } catch (error) {
             console.error('Error validando ticket:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    // Validación directa estilo "validate-voucher" (sin controles de rol)
+    ipcMain.handle('caja:validate-voucher', async (event, voucherCode) => {
+        console.log('==========================================');
+        console.log('🔍 VALIDATE-VOUCHER LLAMADO');
+        console.log('Código:', voucherCode);
+        try {
+            const senderTitle = (() => { try { return event?.sender?.getTitle?.(); } catch { return ''; } })();
+            console.log('Usuario (title):', senderTitle);
+
+            const normalized = String(voucherCode || '').toUpperCase().trim();
+            let voucher = null;
+
+            // Intentar leer directamente desde tabla vouchers si existe
+            try {
+                const info = db.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='vouchers'").get();
+                if (info) {
+                    const row = db.db.prepare('SELECT * FROM vouchers WHERE voucher_code = ?').get(normalized);
+                    if (row) {
+                        voucher = {
+                            id: row.id || row.voucher_id || row.id,
+                            voucher_code: row.voucher_code || normalized,
+                            amount: Number(row.amount || row.monto || 0),
+                            currency: row.currency || row.moneda || 'DOP',
+                            status: (row.status || 'active').toLowerCase(),
+                            issued_at: row.issued_at || row.fecha_emision || null,
+                            expires_at: row.expires_at || row.fecha_expiracion || null
+                        };
+                    }
+                }
+            } catch (e) {
+                // Si falla la tabla vouchers, seguimos con fallback
+                console.warn('Fallback a tickets para validar voucher:', e?.message);
+            }
+
+            // Fallback: usar getVoucherByCode (mapeado a tickets)
+            if (!voucher) {
+                voucher = (typeof db.getVoucherByCode === 'function') ? db.getVoucherByCode(normalized) : null;
+            }
+
+            console.log('Voucher encontrado?', !!voucher);
+            if (voucher) {
+                console.log('  - Amount:', voucher.amount);
+                console.log('  - Currency:', voucher.currency);
+                console.log('  - Status:', voucher.status);
+                console.log('  - Expires:', voucher.expires_at);
+            }
+
+            if (!voucher) {
+                return { success: false, error: 'Voucher no encontrado', valid: false, message: 'Voucher no encontrado' };
+            }
+            if (voucher.status !== 'active') {
+                const estado = voucher.status === 'redeemed' ? 'canjeado' : (voucher.status === 'expired' ? 'expirado' : voucher.status);
+                return { success: false, error: `Voucher ${estado === 'canjeado' ? 'ya fue usado' : 'no válido'}`, valid: false, estado, message: `Voucher ${estado}` };
+            }
+            if (voucher.expires_at && new Date(voucher.expires_at) < new Date()) {
+                return { success: false, error: 'Voucher expirado', valid: false, estado: 'expirado', message: 'Voucher expirado' };
+            }
             return {
-                valid: false,
-                reason: 'error',
-                error: error.message
+                success: true,
+                valid: true,
+                estado: 'emitido',
+                voucher: {
+                    code: voucher.voucher_code,
+                    amount: voucher.amount,
+                    currency: voucher.currency,
+                    issued_at: voucher.issued_at,
+                    status: voucher.status
+                }
             };
+        } catch (error) {
+            console.error('❌ Error en validación:', error);
+            console.error('Stack:', error?.stack);
+            return { success: false, error: error.message, message: error.message };
         }
     });
     
@@ -118,6 +220,10 @@ function registerCajaHandlers() {
     // Buscar ticket por código
     ipcMain.handle('caja:get-ticket', async (event, code) => {
         try {
+            if (typeof db.getVoucherByCode === 'function') {
+                const voucher = db.getVoucherByCode(code);
+                return voucher;
+            }
             const ticket = db.getTicket(code);
             return ticket;
         } catch (error) {
@@ -133,6 +239,26 @@ function registerCajaHandlers() {
             return tickets;
         } catch (error) {
             console.error('Error obteniendo tickets por fecha:', error);
+            return [];
+        }
+    });
+
+    // Listar últimos vouchers (desde tabla tickets)
+    ipcMain.handle('list-vouchers', async () => {
+        try {
+            const rows = db.db.prepare(`
+                SELECT code AS voucher_code, amount, currency, estado AS status, fecha_emision AS issued_at
+                FROM tickets
+                ORDER BY fecha_emision DESC
+                LIMIT 20
+            `).all();
+            console.log('📋 Vouchers en BD:', rows.length);
+            rows.forEach(v => {
+                console.log(`   ${v.voucher_code}: ${v.currency} ${v.amount} (${v.status})`);
+            });
+            return rows;
+        } catch (error) {
+            console.error('Error listando vouchers:', error);
             return [];
         }
     });

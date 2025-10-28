@@ -1,0 +1,725 @@
+ ARCHIVO ACTUALIZADO: Caja/caja.html
+html<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Caja - Validación de Vouchers</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1a1f2e;
+            color: #ffffff;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            font-size: 32px;
+            margin-bottom: 30px;
+        }
+
+        .nav-buttons {
+            margin-bottom: 30px;
+        }
+
+        .nav-buttons button {
+            background: #4299e1;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin-right: 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .nav-buttons button:hover {
+            background: #3182ce;
+        }
+
+        .validation-section {
+            background: #232938;
+            border-radius: 12px;
+            padding: 30px;
+            margin-bottom: 30px;
+        }
+
+        .validation-section h2 {
+            font-size: 24px;
+            margin-bottom: 20px;
+        }
+
+        .input-modes {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .mode-btn {
+            padding: 8px 16px;
+            background: #2d3748;
+            color: #a0aec0;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .mode-btn.active {
+            background: #4299e1;
+            color: white;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        #voucherCode {
+            flex: 1;
+            padding: 12px;
+            font-size: 16px;
+            background: #0f1419;
+            border: 2px solid #2d3748;
+            color: white;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        #voucherCode:focus {
+            outline: none;
+            border-color: #4299e1;
+            background: #1a202c;
+        }
+
+        #validateBtn {
+            background: #48bb78;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            font-size: 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        #validateBtn:hover {
+            background: #38a169;
+        }
+
+        #validateBtn:disabled {
+            background: #718096;
+            cursor: not-allowed;
+        }
+
+        .scanner-status {
+            padding: 10px;
+            background: #2d3748;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            text-align: center;
+            font-size: 14px;
+            color: #a0aec0;
+        }
+
+        .scanner-status.active {
+            background: #2b6cb0;
+            color: white;
+        }
+
+        .scanner-status.manual {
+            background: #805ad5;
+            color: white;
+        }
+
+        .result-section {
+            background: #232938;
+            border-radius: 12px;
+            padding: 30px;
+            margin-bottom: 30px;
+            display: none;
+        }
+
+        .result-section.show {
+            display: block;
+        }
+
+        .result-valid {
+            border-left: 4px solid #48bb78;
+        }
+
+        .result-invalid {
+            border-left: 4px solid #f56565;
+        }
+
+        .result-used {
+            border-left: 4px solid #ed8936;
+        }
+
+        .ticket-info {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .info-label {
+            color: #718096;
+        }
+
+        .info-value {
+            font-weight: 600;
+        }
+
+        .amount-display {
+            font-size: 36px;
+            font-weight: bold;
+            text-align: center;
+            margin: 20px 0;
+            color: #48bb78;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .btn-confirm {
+            flex: 1;
+            background: #48bb78;
+            color: white;
+            border: none;
+            padding: 15px;
+            font-size: 18px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .btn-cancel {
+            flex: 1;
+            background: #f56565;
+            color: white;
+            border: none;
+            padding: 15px;
+            font-size: 18px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .stats-section {
+            background: #232938;
+            border-radius: 12px;
+            padding: 30px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+        }
+
+        .stat-card {
+            background: #0f1419;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 28px;
+            font-weight: bold;
+            color: #4299e1;
+        }
+
+        .stat-label {
+            color: #718096;
+            margin-top: 5px;
+            font-size: 14px;
+        }
+
+        .audit-log {
+            background: #0f1419;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 20px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .log-entry {
+            padding: 5px;
+            border-bottom: 1px solid #2d3748;
+            font-size: 12px;
+            color: #a0aec0;
+        }
+
+        .log-entry:last-child {
+            border-bottom: none;
+        }
+
+        .alert {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .alert.show {
+            display: block;
+        }
+
+        .alert-success {
+            background: #48bb78;
+            color: white;
+        }
+
+        .alert-error {
+            background: #f56565;
+            color: white;
+        }
+
+        .alert-warning {
+            background: #ed8936;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Caja - Validación de Vouchers</h1>
+        
+        <div class="nav-buttons">
+            <button onclick="location.href='../Electron_Puro/panel.html'">Volver al Panel</button>
+            <button onclick="viewAudit()">Ver Auditoría</button>
+            <button onclick="if(confirm('¿Salir del sistema?')) window.close()">Salir</button>
+        </div>
+
+        <div id="alertBox" class="alert"></div>
+
+        <div class="validation-section">
+            <h2>Validar Voucher</h2>
+            
+            <div class="input-modes">
+                <button class="mode-btn active" onclick="setMode('scanner')">🔍 Scanner QR</button>
+                <button class="mode-btn" onclick="setMode('manual')">⌨️ Entrada Manual</button>
+            </div>
+            
+            <div class="scanner-status" id="scannerStatus">
+                🔍 Esperando lectura de QR...
+            </div>
+            
+            <div class="input-group">
+                <input 
+                    type="text" 
+                    id="voucherCode" 
+                    placeholder="PREV-XXXXXX o escanear QR"
+                    autocomplete="off"
+                    autofocus
+                >
+                <button id="validateBtn" onclick="validateVoucher()">Validar</button>
+            </div>
+
+            <div style="color: #718096; font-size: 12px;">
+                Formato: PREV-XXXXXX (ej: PREV-001234)
+            </div>
+        </div>
+
+        <div id="resultSection" class="result-section">
+            <!-- Aquí aparecerán los resultados -->
+        </div>
+
+        <div class="stats-section">
+            <h2>Estadísticas de Hoy</h2>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-value" id="ticketsHoy">0</div>
+                    <div class="stat-label">Tickets Hoy</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="totalDOP">RD$ 0</div>
+                    <div class="stat-label">Total DOP</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="totalUSD">$ 0</div>
+                    <div class="stat-label">Total USD</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="pendientes">0</div>
+                    <div class="stat-label">Pendientes</div>
+                </div>
+            </div>
+
+            <div class="audit-log">
+                <h3 style="margin-bottom: 10px;">Últimas Operaciones</h3>
+                <div id="auditLog"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentTicket = null;
+        let lastScanTime = 0;
+        let inputMode = 'scanner';
+        let operationsLog = [];
+
+        // Configurar modo de entrada
+        function setMode(mode) {
+            inputMode = mode;
+            document.querySelectorAll('.mode-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            const scannerStatus = document.getElementById('scannerStatus');
+            if (mode === 'manual') {
+                scannerStatus.classList.add('manual');
+                scannerStatus.textContent = '⌨️ Modo manual - Ingrese código y presione Validar';
+            } else {
+                scannerStatus.classList.remove('manual');
+                scannerStatus.textContent = '🔍 Esperando lectura de QR...';
+            }
+            
+            document.getElementById('voucherCode').focus();
+        }
+
+        // Configurar scanner automático
+        const voucherInput = document.getElementById('voucherCode');
+        const scannerStatus = document.getElementById('scannerStatus');
+        
+        // Detectar entrada rápida (scanner)
+        voucherInput.addEventListener('input', function(e) {
+            if (inputMode === 'scanner') {
+                const now = Date.now();
+                const timeDiff = now - lastScanTime;
+                lastScanTime = now;
+                
+                // Si es entrada rápida (< 50ms entre caracteres) = scanner
+                if (timeDiff < 50 && this.value.length > 3) {
+                    scannerStatus.classList.add('active');
+                    scannerStatus.textContent = '📷 Escaneando...';
+                }
+                
+                // Auto-validar si detecta formato completo
+                if (this.value.match(/^PREV-\d{6}$/)) {
+                    setTimeout(() => {
+                        validateVoucher();
+                    }, 100);
+                }
+            }
+        });
+
+        // Validar con Enter en modo manual
+        voucherInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter' && inputMode === 'manual') {
+                validateVoucher();
+            }
+        });
+
+        // Validar voucher
+        async function validateVoucher() {
+            const code = voucherInput.value.trim().toUpperCase();
+            
+            if (!code) {
+                showAlert('Por favor ingrese el código del voucher', 'warning');
+                return;
+            }
+            
+            // Validar formato
+            if (!code.match(/^PREV-\d{6}$/)) {
+                showAlert('Formato inválido. Use: PREV-XXXXXX', 'error');
+                return;
+            }
+            
+            document.getElementById('validateBtn').disabled = true;
+            scannerStatus.textContent = '🔄 Validando en base de datos...';
+            
+            try {
+                // Llamar a IPC para validar en base de datos real
+                let result;
+                if (window.api && window.api.invoke) {
+                    // Validación real contra SQLite
+                    result = await window.api.invoke('caja:validate-ticket', code);
+                    
+                    // Log para auditoría
+                    await window.api.invoke('add-audit-log', {
+                        tipo: 'validacion_ticket',
+                        codigo: code,
+                        resultado: result.valid ? 'exitoso' : 'fallido'
+                    });
+                } else {
+                    // Mock solo para desarrollo
+                    console.warn('API no disponible, usando mock');
+                    result = mockValidate(code);
+                }
+                
+                displayResult(result);
+                logOperation(`Validación: ${code} - ${result.valid ? 'VÁLIDO' : 'INVÁLIDO'}`);
+                
+            } catch (error) {
+                console.error('Error:', error);
+                showAlert('Error al validar: ' + error.message, 'error');
+            } finally {
+                document.getElementById('validateBtn').disabled = false;
+                scannerStatus.classList.remove('active');
+                scannerStatus.textContent = inputMode === 'manual' ? 
+                    '⌨️ Modo manual - Ingrese código y presione Validar' :
+                    '🔍 Esperando lectura de QR...';
+            }
+        }
+
+        // Mock para desarrollo (solo cuando no hay IPC)
+        function mockValidate(code) {
+            const random = Math.random();
+            if (random > 0.7) {
+                return {
+                    valid: false,
+                    reason: 'used',
+                    ticket: {
+                        code: code,
+                        amount: 200,
+                        currency: 'DOP',
+                        fecha_cobro: '2025-10-24 10:30:00'
+                    }
+                };
+            } else if (random > 0.4) {
+                return {
+                    valid: true,
+                    ticket: {
+                        code: code,
+                        amount: 335.45,
+                        currency: 'DOP',
+                        mesa: 'P01',
+                        fecha_emision: new Date().toISOString(),
+                        estado: 'emitido'
+                    }
+                };
+            } else {
+                return {
+                    valid: false,
+                    reason: 'not_found'
+                };
+            }
+        }
+
+        // Mostrar resultado
+        function displayResult(result) {
+            const resultSection = document.getElementById('resultSection');
+            resultSection.classList.add('show');
+            
+            if (result.valid) {
+                currentTicket = result.ticket;
+                resultSection.className = 'result-section show result-valid';
+                resultSection.innerHTML = `
+                    <h3 style="color: #48bb78;">✅ TICKET VÁLIDO</h3>
+                    <div class="ticket-info">
+                        <span class="info-label">Código:</span>
+                        <span class="info-value">${result.ticket.code}</span>
+                        <span class="info-label">Mesa:</span>
+                        <span class="info-value">${result.ticket.mesa || 'N/A'}</span>
+                        <span class="info-label">Fecha Emisión:</span>
+                        <span class="info-value">${formatDate(result.ticket.fecha_emision)}</span>
+                        <span class="info-label">Estado:</span>
+                        <span class="info-value">${result.ticket.estado || 'Activo'}</span>
+                    </div>
+                    <div class="amount-display">
+                        ${result.ticket.currency === 'USD' ? '$' : 'RD$'} ${result.ticket.amount.toFixed(2)}
+                    </div>
+                    <div class="action-buttons">
+                        <button class="btn-confirm" onclick="confirmPayment()">
+                            💰 CONFIRMAR PAGO
+                        </button>
+                        <button class="btn-cancel" onclick="cancelValidation()">
+                            ❌ CANCELAR
+                        </button>
+                    </div>
+                `;
+            } else if (result.reason === 'used') {
+                resultSection.className = 'result-section show result-used';
+                resultSection.innerHTML = `
+                    <h3 style="color: #ed8936;">⚠️ TICKET YA COBRADO</h3>
+                    <p>Este ticket ya fue cobrado anteriormente.</p>
+                    <div class="ticket-info">
+                        <span class="info-label">Código:</span>
+                        <span class="info-value">${result.ticket.code}</span>
+                        <span class="info-label">Fecha de Cobro:</span>
+                        <span class="info-value">${formatDate(result.ticket.fecha_cobro)}</span>
+                        <span class="info-label">Monto:</span>
+                        <span class="info-value">${result.ticket.currency === 'USD' ? '$' : 'RD$'} ${result.ticket.amount}</span>
+                    </div>
+                    <button class="btn-cancel" onclick="cancelValidation()">
+                        Validar Otro Ticket
+                    </button>
+                `;
+            } else {
+                resultSection.className = 'result-section show result-invalid';
+                resultSection.innerHTML = `
+                    <h3 style="color: #f56565;">❌ TICKET NO ENCONTRADO</h3>
+                    <p>El código ingresado no existe en la base de datos.</p>
+                    <p>Código: <strong>${voucherInput.value}</strong></p>
+                    <button class="btn-cancel" onclick="cancelValidation()">
+                        Intentar de Nuevo
+                    </button>
+                `;
+            }
+        }
+
+        // Confirmar pago
+        async function confirmPayment() {
+            if (!currentTicket) return;
+            
+            if (!confirm(`¿Confirmar pago de ${currentTicket.currency === 'USD' ? '$' : 'RD$'} ${currentTicket.amount}?`)) {
+                return;
+            }
+            
+            try {
+                let result;
+                if (window.api && window.api.invoke) {
+                    // Cobro real en base de datos
+                    result = await window.api.invoke('caja:redeem-ticket', currentTicket.code);
+                    
+                    // Registrar en auditoría
+                    await window.api.invoke('add-audit-log', {
+                        tipo: 'cobro_ticket',
+                        codigo: currentTicket.code,
+                        monto: currentTicket.amount,
+                        moneda: currentTicket.currency
+                    });
+                } else {
+                    // Mock
+                    result = { success: true };
+                }
+                
+                if (result.success) {
+                    showAlert(`✅ Pago procesado: ${currentTicket.currency === 'USD' ? '$' : 'RD$'} ${currentTicket.amount}`, 'success');
+                    logOperation(`COBRO: ${currentTicket.code} - ${currentTicket.currency} ${currentTicket.amount}`);
+                    cancelValidation();
+                    await updateStats();
+                } else {
+                    showAlert('Error al procesar pago', 'error');
+                }
+            } catch (error) {
+                showAlert('Error al procesar pago: ' + error.message, 'error');
+            }
+        }
+
+        // Cancelar validación
+        function cancelValidation() {
+            voucherInput.value = '';
+            document.getElementById('resultSection').classList.remove('show');
+            currentTicket = null;
+            voucherInput.focus();
+        }
+
+        // Actualizar estadísticas
+        async function updateStats() {
+            try {
+                let stats;
+                if (window.api && window.api.invoke) {
+                    stats = await window.api.invoke('caja:get-stats-today');
+                } else {
+                    // Mock stats
+                    stats = {
+                        ticketsHoy: 10,
+                        totalDOP: 3354.50,
+                        totalUSD: 250,
+                        pendientes: 5,
+                        cobrados: 5
+                    };
+                }
+                
+                document.getElementById('ticketsHoy').textContent = stats.ticketsHoy;
+                document.getElementById('totalDOP').textContent = `RD$ ${stats.totalDOP.toFixed(2)}`;
+                document.getElementById('totalUSD').textContent = `$ ${stats.totalUSD.toFixed(2)}`;
+                document.getElementById('pendientes').textContent = stats.pendientes;
+            } catch (error) {
+                console.error('Error cargando stats:', error);
+            }
+        }
+
+        // Log de operaciones local
+        function logOperation(message) {
+            const now = new Date().toLocaleString();
+            operationsLog.unshift(`${now}: ${message}`);
+            operationsLog = operationsLog.slice(0, 10); // Mantener solo 10 últimas
+            
+            const logDiv = document.getElementById('auditLog');
+            logDiv.innerHTML = operationsLog.map(entry => 
+                `<div class="log-entry">${entry}</div>`
+            ).join('');
+        }
+
+        // Ver auditoría completa
+        function viewAudit() {
+            if (window.api && window.api.invoke) {
+                window.api.invoke('open-audit-window');
+            } else {
+                alert('Panel de auditoría disponible solo en aplicación Electron');
+            }
+        }
+
+        // Mostrar alerta
+        function showAlert(message, type = 'info') {
+            const alertBox = document.getElementById('alertBox');
+            alertBox.className = `alert alert-${type} show`;
+            alertBox.textContent = message;
+            
+            setTimeout(() => {
+                alertBox.classList.remove('show');
+            }, 3000);
+        }
+
+        // Formatear fecha
+        function formatDate(dateString) {
+            if (!dateString) return 'N/A';
+            const date = new Date(dateString);
+            return date.toLocaleString('es-DO');
+        }
+
+        // Inicializar
+        updateStats();
+        voucherInput.focus();
+
+        // Auto-focus después de cada acción
+        document.addEventListener('click', () => {
+            if (!document.activeElement || document.activeElement === document.body) {
+                voucherInput.focus();
+            }
+        });
+
+        // Actualizar stats cada 30 segundos
+        setInterval(updateStats, 30000);
+    </script>
+</body>
+</html>
+🔧 CARACTERÍSTICAS AÑADIDAS:
+
+Modo Dual: Scanner automático + entrada manual
+Validación de formato: PREV-XXXXXX obligatorio
+Verificación en BD real: Usa IPC para consultar SQLite
+Estados del ticket: Válido, Ya cobrado, No existe
+Auditoría local: Muestra últimas 10 operaciones
+Registro en BD: Cada validación y cobro se registra
+Confirmación de pago: Diálogo antes de cobrar
+Actualización automática: Stats cada 30 segundos
+Alertas visuales: Para éxito, error y advertencias
+Formato de moneda: RD$ para pesos, $ para dólares
+
+La vista ahora valida contra la base de datos real y registra todo para auditoría posterior.

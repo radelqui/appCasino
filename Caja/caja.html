@@ -1,145 +1,361 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Caja - Validación de Vouchers</title>
-    <link rel="stylesheet" href="styles.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Caja - Validación de Vouchers</title>
+  <style>
+    :root {
+      --bg: #0b0f1a;
+      --panel: #12182b;
+      --accent: #2e7de9;
+      --accent-2: #7bc379;
+      --warning: #e3b341;
+      --danger: #e35d5d;
+      --text: #e8eefc;
+      --muted: #a9b3c7;
+      --border: #1f2740;
+      --shadow: rgba(0,0,0,0.35);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; padding: 24px; background: var(--bg); color: var(--text);
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, "Noto Sans", Arial, "Apple Color Emoji", "Segoe UI Emoji";
+    }
+    h1, h2, h3 { margin: 0 0 12px; font-weight: 600; }
+    h1 { font-size: 28px; }
+    h2 { font-size: 20px; color: var(--muted); }
+    .toolbar { display: flex; gap: 12px; align-items: center; margin-bottom: 16px; }
+    .btn {
+      display: inline-flex; align-items: center; gap: 8px; padding: 10px 14px; border-radius: 8px;
+      border: 1px solid var(--border); background: #18203b; color: var(--text); cursor: pointer;
+      box-shadow: 0 2px 8px var(--shadow); user-select: none;
+    }
+    .btn:hover { filter: brightness(1.1); }
+    .btn:active { transform: translateY(1px); }
+    .btn-primary { background: #1a2550; border-color: #2d3b71; }
+    .btn-danger { background: #3a1d1f; border-color: #5b2b2e; }
+    .btn-warning { background: #3a321d; border-color: #5b502b; }
+    .grid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 16px; }
+    .card { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 16px; box-shadow: 0 6px 20px var(--shadow); }
+    .field { display: flex; gap: 8px; align-items: center; margin: 12px 0; }
+    .input {
+      flex: 1; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border); background: #0e1427; color: var(--text);
+      box-shadow: inset 0 1px 4px rgba(0,0,0,0.35);
+    }
+    .badge { display: inline-block; padding: 6px 10px; border-radius: 999px; font-size: 12px; border: 1px solid var(--border); background: #101735; color: var(--muted); }
+    .status-ok { color: #89d789; }
+    .status-bad { color: #ff8080; }
+    .status-warn { color: #ffd479; }
+    .list { display: grid; gap: 10px; margin-top: 8px; }
+    .row { display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; background: #0f1731; border: 1px solid var(--border); border-radius: 10px; }
+    .row .label { color: var(--muted); }
+    .row .value { font-weight: 600; }
+    .hint { color: var(--muted); font-size: 12px; }
+    .flex { display: flex; gap: 8px; align-items: center; }
+    .spacer { flex: 1; }
+    .footer { margin-top: 10px; color: var(--muted); font-size: 12px; }
+    .mode { display: inline-flex; gap: 8px; align-items: center; }
+    .scanner-ready { color: var(--accent-2); }
+    .scanner-warn { color: var(--warning); }
+    /* Voucher info panel */
+    .voucher-details { background: rgba(255,255,255,0.05); border-radius: 12px; padding: 20px; margin: 20px 0; }
+    .detail-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.1); }
+    .detail-row:last-child { border-bottom: none; }
+    .detail-row.highlight { background: rgba(76, 175, 80, 0.1); border-radius: 8px; padding: 15px; margin: 10px 0; }
+    .detail-row .label { color: #aaa; font-size: 14px; }
+    .detail-row .value { color: #fff; font-weight: 600; }
+    .detail-row .amount { font-size: 24px; color: #4caf50; }
+    .btn-redeem { background: linear-gradient(135deg, #4caf50, #45a049); color: white; border: none; padding: 15px 30px; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; width: 100%; margin: 10px 0; }
+    .btn-redeem:hover { background: linear-gradient(135deg, #45a049, #3d8b40); }
+    .btn-cancel { background: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,255,255,0.2); padding: 12px 30px; border-radius: 8px; cursor: pointer; width: 100%; }
+  </style>
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1>Caja</h1>
-            <nav>
-                <button id="volverPanel">Volver al Panel</button>
-                <button id="salir">Salir</button>
-            </nav>
-        </header>
+  <div class="toolbar">
+    <button class="btn" id="backBtn">Volver al Panel</button>
+    <button class="btn btn-danger" id="exitBtn">Salir</button>
+    <span class="spacer"></span>
+    <button class="btn" id="viewAuditBtn">Ver Auditoría</button>
+  </div>
 
-        <section class="validate">
-            <h2>Validar Voucher</h2>
-            <input type="text" id="voucherCode" placeholder="Código del voucher">
-            <button id="validateBtn">Validar</button>
-            <div id="validationResult"></div>
-        </section>
+  <div class="grid">
+    <section class="card" id="validateSection">
+      <div class="flex">
+        <h1>Caja</h1>
+        <span class="badge" id="roleBadge">Rol: —</span>
+        <span class="spacer"></span>
+        <div class="mode">
+          <span>Modo</span>
+          <select id="modeSelect" class="input" style="width:160px">
+            <option value="manual">Manual</option>
+            <option value="scanner">Escáner</option>
+          </select>
+        </div>
+      </div>
+      <h2>Validar Voucher</h2>
+      <div class="field">
+        <input type="text" id="voucherInput" class="input" placeholder="Código del voucher" autocomplete="off" />
+        <button class="btn btn-primary" id="validateBtn">Validar</button>
+      </div>
+      <div class="field" id="scannerSection" style="display:none; flex-direction:column; align-items:flex-start; gap:12px;">
+        <div class="hint">Escáner QR (cámara)</div>
+        <video id="scannerVideo" width="320" height="240" style="border:1px solid var(--border); background:#000" playsinline></video>
+        <canvas id="scannerCanvas" width="320" height="240" style="display:none"></canvas>
+      </div>
+      <div class="hint" id="scannerHint">Escáner: Detectando…</div>
+      <div class="list" id="validationList"></div>
+      <!-- Panel de información de voucher -->
+      <div id="voucher-info" style="display:none;">
+        <h3>Voucher Válido</h3>
+        <div class="voucher-details">
+          <div class="detail-row">
+            <span class="label">Código:</span>
+            <span class="value" id="voucher-code">-</span>
+          </div>
+          <div class="detail-row highlight">
+            <span class="label">Monto:</span>
+            <span class="value amount" id="voucher-amount">$0.00</span>
+          </div>
+          <div class="detail-row">
+            <span class="label">Moneda:</span>
+            <span class="value" id="voucher-currency">-</span>
+          </div>
+          <div class="detail-row">
+            <span class="label">Emitido:</span>
+            <span class="value" id="voucher-issued">-</span>
+          </div>
+          <div class="detail-row">
+            <span class="label">Mesa:</span>
+            <span class="value" id="voucher-station">N/A</span>
+          </div>
+        </div>
+        <button id="btn-redeem" class="btn-redeem">💰 Canjear y Pagar</button>
+        <button id="btn-cancel" class="btn-cancel">Cancelar</button>
+      </div>
+      <div class="footer">Consejo: usa la tecla Enter para validar más rápido.</div>
+    </section>
 
-        <section class="redeem" style="display:none;">
-            <h2>Cobrar Voucher</h2>
-            <div id="voucherDetails"></div>
-            <button id="redeemBtn">Cobrar</button>
-            <button id="cancelBtn">Cancelar</button>
-        </section>
+    <section class="card">
+      <h2>Estadísticas de Hoy</h2>
+      <div class="list" id="statsList">
+        <div class="row"><span class="label">Tickets Hoy</span><span class="value" id="statsTickets">—</span></div>
+        <div class="row"><span class="label">Total DOP</span><span class="value" id="statsDOP">—</span></div>
+        <div class="row"><span class="label">Total USD</span><span class="value" id="statsUSD">—</span></div>
+        <div class="row"><span class="label">Pendientes</span><span class="value" id="statsPending">—</span></div>
+      </div>
+    </section>
+  </div>
 
-        <section class="stats">
-            <h2>Estadísticas de Hoy</h2>
-            <div class="stats-grid">
-                <div><strong>Tickets Hoy:</strong> <span id="ticketsHoy">0</span></div>
-                <div><strong>Total DOP:</strong> <span id="totalDOP">0</span></div>
-                <div><strong>Total USD:</strong> <span id="totalUSD">0</span></div>
-                <div><strong>Pendientes:</strong> <span id="pendientes">0</span></div>
-            </div>
-        </section>
-    </div>
+  <template id="tplRow">
+    <div class="row"><span class="label"></span><span class="value"></span></div>
+  </template>
 
-    <script>
-        const resultDiv = document.getElementById('validationResult');
-        const voucherDetailsDiv = document.getElementById('voucherDetails');
-        const redeemSection = document.querySelector('.redeem');
-        const validateBtn = document.getElementById('validateBtn');
-        const redeemBtn = document.getElementById('redeemBtn');
-        const cancelBtn = document.getElementById('cancelBtn');
-        const volverPanelBtn = document.getElementById('volverPanel');
-        const salirBtn = document.getElementById('salir');
+  <script>
+    const q = sel => document.querySelector(sel);
+    const roleBadge = q('#roleBadge');
+    const voucherInput = q('#voucherInput');
+    const validateBtn = q('#validateBtn');
+    const validationList = q('#validationList');
+    const modeSelect = q('#modeSelect');
+    const scannerHint = q('#scannerHint');
+    const scannerSection = q('#scannerSection');
+    const scannerVideo = q('#scannerVideo');
+    const scannerCanvas = q('#scannerCanvas');
 
-        function hasIPC() {
-            return typeof window !== 'undefined' && window.api && typeof window.api.validateTicket === 'function';
+    const statsTickets = q('#statsTickets');
+    const statsDOP = q('#statsDOP');
+    const statsUSD = q('#statsUSD');
+    const statsPending = q('#statsPending');
+    const voucherInfo = q('#voucher-info');
+    const voucherCodeEl = q('#voucher-code');
+    const voucherAmountEl = q('#voucher-amount');
+    const voucherCurrencyEl = q('#voucher-currency');
+    const voucherIssuedEl = q('#voucher-issued');
+    const voucherStationEl = q('#voucher-station');
+    const btnRedeem = q('#btn-redeem');
+    const btnCancel = q('#btn-cancel');
+
+    // Navegación
+    q('#backBtn').addEventListener('click', async () => {
+      // Navegar explícitamente al panel para evitar quedarse en Caja
+      try { await window.api?.navigateTo?.('panel'); } catch {}
+      // Como compat, enfocar panel y cerrar si hay ventana secundaria
+      try { await window.api?.focusPanel?.(); } catch {}
+      try { await window.api?.closeCurrent?.(); } catch {}
+    });
+    q('#exitBtn').addEventListener('click', () => {
+      try { window.api?.exitApp?.(); } catch {}
+    });
+    q('#viewAuditBtn').addEventListener('click', () => {
+      try { window.api?.navigateTo?.('auditoria'); } catch {}
+    });
+
+    // Estado del rol
+    (async () => {
+      try {
+        const role = await window.api?.getRole?.();
+        roleBadge.textContent = `Rol: ${role || '—'}`;
+      } catch { roleBadge.textContent = 'Rol: —'; }
+    })();
+
+    // Modo escáner: solo UI (enter simula lectura)
+    let scannerReady = false;
+    function setScannerState(state) {
+      scannerReady = state;
+      if (state) {
+        scannerHint.textContent = 'Escáner: Listo';
+        scannerHint.classList.remove('scanner-warn');
+        scannerHint.classList.add('scanner-ready');
+      } else {
+        scannerHint.textContent = 'Escáner: Detectando…';
+        scannerHint.classList.add('scanner-warn');
+        scannerHint.classList.remove('scanner-ready');
+      }
+    }
+    let scanInterval = null;
+    let mediaStream = null;
+    async function startScanner(){
+      try {
+        scannerSection.style.display = 'flex';
+        mediaStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+        scannerVideo.srcObject = mediaStream;
+        await scannerVideo.play();
+        scanInterval = setInterval(() => scanFrame(), 300);
+      } catch (e) {
+        setScannerState(false);
+        scannerHint.textContent = 'Escáner: Error iniciando cámara';
+      }
+    }
+    function stopScanner(){
+      scannerSection.style.display = 'none';
+      try { if (scanInterval) clearInterval(scanInterval); scanInterval = null; } catch {}
+      try { scannerVideo.pause(); } catch {}
+      try { if (mediaStream) mediaStream.getTracks().forEach(t => t.stop()); mediaStream = null; } catch {}
+    }
+    async function scanFrame(){
+      try {
+        const w = scannerCanvas.width, h = scannerCanvas.height;
+        const ctx = scannerCanvas.getContext('2d');
+        ctx.drawImage(scannerVideo, 0, 0, w, h);
+        const imageData = ctx.getImageData(0, 0, w, h);
+        const code = window.jsQR ? window.jsQR(imageData.data, w, h) : null;
+        if (code && code.data){
+          voucherInput.value = code.data.trim();
+          validateVoucher();
         }
+      } catch {}
+    }
 
-        async function loadStats() {
-            try {
-                if (!hasIPC()) throw new Error('IPC no disponible en este entorno');
-                const stats = await window.api.getStatsToday();
-                document.getElementById('ticketsHoy').textContent = stats.ticketsHoy || 0;
-                document.getElementById('totalDOP').textContent = stats.totalDOP || 0;
-                document.getElementById('totalUSD').textContent = stats.totalUSD || 0;
-                document.getElementById('pendientes').textContent = stats.pendientes || 0;
-            } catch (error) {
-                console.error('Error cargando stats:', error);
-                // Mostrar ceros si no hay IPC
-                document.getElementById('ticketsHoy').textContent = 0;
-                document.getElementById('totalDOP').textContent = 0;
-                document.getElementById('totalUSD').textContent = 0;
-                document.getElementById('pendientes').textContent = 0;
-            }
+    modeSelect.addEventListener('change', () => {
+      const mode = modeSelect.value;
+      if (mode === 'scanner') { setScannerState(true); startScanner(); } else { setScannerState(false); stopScanner(); }
+      voucherInput.focus();
+    });
+
+    // Render helpers
+    function addValidationRow(label, value, kind = 'info') {
+      const row = document.getElementById('tplRow').content.cloneNode(true);
+      const lbl = row.querySelector('.label');
+      const val = row.querySelector('.value');
+      lbl.textContent = label;
+      val.textContent = value;
+      if (kind === 'ok') val.classList.add('status-ok');
+      if (kind === 'bad') val.classList.add('status-bad');
+      if (kind === 'warn') val.classList.add('status-warn');
+      validationList.prepend(row);
+    }
+
+    async function refreshStats() {
+      try {
+        const stats = await window.api?.getStatsToday?.();
+        statsTickets.textContent = stats?.ticketsToday ?? '0';
+        statsDOP.textContent = stats?.totalDOP ?? '0';
+        statsUSD.textContent = stats?.totalUSD ?? '0';
+        statsPending.textContent = stats?.pending ?? '0';
+      } catch (e) {
+        statsTickets.textContent = '0';
+        statsDOP.textContent = '0';
+        statsUSD.textContent = '0';
+        statsPending.textContent = '0';
+      }
+    }
+
+    let currentVoucher = null;
+    function hideVoucherInfo() { try { voucherInfo.style.display = 'none'; currentVoucher = null; } catch {} }
+
+    async function validateVoucher() {
+      const code = voucherInput.value.trim();
+      if (!code) return;
+      try {
+        // Usar la validación directa de voucher sin rol
+        const res = await window.api?.validateVoucher?.(code);
+        if (!res) { addValidationRow('Validación', 'Sin respuesta', 'warn'); hideVoucherInfo(); return; }
+        if (res.error || res.success === false || res.valid === false) { addValidationRow('Validación', res.message || res.error || 'Voucher no válido', 'bad'); hideVoucherInfo(); return; }
+        const estado = res.estado || res?.voucher?.status || 'emitido';
+        if (estado === 'emitido' || estado === 'active') {
+          addValidationRow('Voucher', 'Válido (pendiente)', 'ok');
+          // Mostrar información del voucher
+          const v = res.voucher || {};
+          voucherCodeEl.textContent = v.code || code;
+          voucherAmountEl.textContent = `${v.currency || ''} ${Number(v.amount || 0).toFixed(2)}`;
+          voucherCurrencyEl.textContent = v.currency || '—';
+          voucherIssuedEl.textContent = v.issued_at ? new Date(v.issued_at).toLocaleString('es-DO') : '—';
+          voucherStationEl.textContent = v.station || 'N/A';
+          voucherInfo.style.display = 'block';
+          currentVoucher = v;
+        } else if (estado === 'canjeado' || estado === 'redeemed') {
+          addValidationRow('Voucher', 'Ya canjeado', 'warn');
+          hideVoucherInfo();
+        } else if (estado === 'expirado' || estado === 'expired') {
+          addValidationRow('Voucher', 'Expirado', 'warn');
+          hideVoucherInfo();
+        } else {
+          addValidationRow('Voucher', estado || 'Desconocido', 'warn');
+          hideVoucherInfo();
         }
+      } catch (e) {
+        addValidationRow('Error', e?.message || 'Error validando voucher', 'bad');
+        hideVoucherInfo();
+      }
+    }
 
-        async function validateVoucher() {
-            const code = document.getElementById('voucherCode').value.trim();
-            if (!code) {
-                resultDiv.textContent = 'Ingrese un código válido';
-                return;
-            }
-            try {
-                if (!hasIPC()) throw new Error('IPC no disponible');
-                const res = await window.api.validateTicket(code);
-                if (res.valid) {
-                    resultDiv.textContent = 'Voucher válido';
-                    voucherDetailsDiv.innerHTML = `
-                        <p><strong>Código:</strong> ${res.ticket.code}</p>
-                        <p><strong>Monto:</strong> ${res.ticket.amount} ${res.ticket.currency}</p>
-                        <p><strong>Estado:</strong> ${res.ticket.estado}</p>
-                    `;
-                    redeemSection.style.display = 'block';
-                } else {
-                    resultDiv.textContent = res.reason === 'used' ? 'Voucher ya usado' : (res.reason === 'expired' ? 'Voucher expirado' : 'Voucher inválido');
-                    redeemSection.style.display = 'none';
-                }
-            } catch (error) {
-                console.error(error);
-                resultDiv.textContent = 'Error validando voucher. Asegúrese de ejecutar en Electron.';
-                redeemSection.style.display = 'none';
-            }
-        }
+    async function redeemVoucher() {
+      if (!currentVoucher || !currentVoucher.code) { addValidationRow('Canje', 'No hay voucher para canjear', 'bad'); return; }
+      try {
+        const ok = confirm(`¿Canjear voucher por ${currentVoucher.currency || ''} ${Number(currentVoucher.amount || 0).toFixed(2)}?`);
+        if (!ok) return;
+        const res = await window.api?.redeemVoucher?.(currentVoucher.code);
+        if (!res) { addValidationRow('Canje', 'Sin respuesta', 'warn'); return; }
+        if (res.error) { addValidationRow('Canje', res.error || 'Error al canjear', 'bad'); return; }
+        addValidationRow('Canje', '✅ Voucher canjeado exitosamente', 'ok');
+        voucherInput.value = '';
+        hideVoucherInfo();
+        await refreshStats();
+        setTimeout(() => { try { alert(`Pago procesado:\n${res.voucher?.currency || ''} ${Number(res.voucher?.amount || 0).toFixed(2)}\n\nVoucher: ${res.voucher?.code || currentVoucher.code}`); } catch {} }, 400);
+      } catch (e) {
+        addValidationRow('Error', e?.message || 'Error al procesar pago', 'bad');
+      }
+    }
 
-        async function redeemVoucher() {
-            const code = document.getElementById('voucherCode').value.trim();
-            if (!code) return;
-            try {
-                if (!hasIPC()) throw new Error('IPC no disponible');
-                const res = await window.api.redeemTicket(code);
-                if (res.success) {
-                    resultDiv.textContent = 'Voucher cobrado exitosamente';
-                    redeemSection.style.display = 'none';
-                    await loadStats();
-                } else {
-                    resultDiv.textContent = `Error: ${res.error || 'No se pudo cobrar'}`;
-                }
-            } catch (error) {
-                console.error(error);
-                resultDiv.textContent = 'Error cobrando voucher. Ejecute en Electron.';
-            }
-        }
+    validateBtn.addEventListener('click', validateVoucher);
+    voucherInput.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Enter') validateVoucher();
+    });
 
-        validateBtn.addEventListener('click', validateVoucher);
-        redeemBtn.addEventListener('click', redeemVoucher);
-        cancelBtn.addEventListener('click', () => {
-            redeemSection.style.display = 'none';
-        });
+    // Atajos: Ctrl+Enter para canjear
+    document.addEventListener('keydown', (ev) => {
+      if (ev.ctrlKey && ev.key === 'Enter') redeemVoucher();
+    });
 
-        volverPanelBtn.addEventListener('click', () => {
-            if (window.api && typeof window.api.navigateTo === 'function') {
-                window.api.navigateTo('panel');
-            }
-        });
+    // Botones del panel de voucher
+    btnRedeem.addEventListener('click', redeemVoucher);
+    btnCancel.addEventListener('click', () => { voucherInput.value = ''; hideVoucherInfo(); addValidationRow('Validación', 'Cancelado', 'warn'); });
 
-        salirBtn.addEventListener('click', () => {
-            if (window.api && typeof window.api.exitApp === 'function') {
-                window.api.exitApp();
-            }
-        });
-
-        // Inicializar
-        loadStats();
-    </script>
+    // Inicializaciones
+    setScannerState(false);
+    refreshStats();
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 </body>
 </html>

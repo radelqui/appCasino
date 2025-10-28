@@ -487,13 +487,18 @@
 
     <script>
       async function checkSessionAndPrompt(){
+        console.log('[panel] checkSessionAndPrompt called');
         try {
+          console.log('[panel] window.api available:', !!window.api);
           const session = await window.api?.getSession?.();
+          console.log('[panel] getSession result:', session);
           if (session && session.user) {
             const currentRole = await window.api?.getRole?.();
+            console.log('[panel] currentRole:', currentRole);
             updateRoleUI(currentRole);
           } else {
             // Si no hay sesión activa, pedir credenciales
+            console.log('[panel] no active session, showing login modal');
             showLoginApp();
           }
         } catch(e){ 
@@ -503,6 +508,7 @@
         }
       }
       function showLoginApp(){
+        console.log('[panel] showLoginApp');
         const m = document.getElementById('loginAppModal');
         if (m) m.style.display = 'flex';
         const u = document.getElementById('appUsername');
@@ -513,21 +519,27 @@
         if (err) { err.style.display='none'; err.textContent=''; }
       }
       function hideLoginApp(){
+        console.log('[panel] hideLoginApp');
         const m = document.getElementById('loginAppModal');
         if (m) m.style.display = 'none';
       }
       async function attemptLoginApp(){
         try {
+          console.log('[panel] attemptLoginApp');
           const btn = document.getElementById('btnLoginApp');
           if (btn) { btn.disabled = true; btn.textContent = 'Ingresando...'; }
           const username = document.getElementById('appUsername')?.value;
           const password = document.getElementById('appPassword')?.value;
+          console.log('[panel] invoking window.api.loginApp with:', { username, passwordPresent: !!password });
+          console.log('[panel] window.api.loginApp exists:', !!(window.api?.loginApp));
           const res = await window.api?.loginApp?.(username, password);
+          console.log('[panel] loginApp result:', res);
           if (res && res.success){
             hideLoginApp();
             // Actualizar UI según rol y redirigir si es MESA
             try {
               const role = String(res?.user?.role || (await window.api?.getRole?.()) || 'MESA').toUpperCase();
+              console.log('[panel] role after login:', role);
               updateRoleUI(role);
               if (role === 'MESA') {
                 try { openView('mesa'); } catch {}
@@ -538,6 +550,7 @@
             if (err){ err.textContent = res?.error || 'Error de autenticación'; err.style.display='block'; }
           }
         } catch(e){
+          console.error('[panel] attemptLoginApp error:', e);
           const err = document.getElementById('loginAppError');
           if (err){ err.textContent = e?.message || String(e); err.style.display='block'; }
         } finally {

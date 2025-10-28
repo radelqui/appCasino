@@ -1,18 +1,32 @@
 // supabaseClient.js
-require('dotenv').config();
+const path = require('path');
+try {
+  // Carga explícita del .env desde la raíz del proyecto
+  require('dotenv').config({ path: path.join(__dirname, '.env') });
+} catch (_) {}
 const { createClient } = require('@supabase/supabase-js');
 const crypto = require('crypto');
 
 let client = null;
 
+function logEnvDiagnostics() {
+  try {
+    console.log('📋 Verificando .env:');
+    console.log('  SUPABASE_URL:', process.env.SUPABASE_URL ? '✅ OK' : '❌ FALTA');
+    console.log('  SUPABASE_ANON_KEY:', process.env.SUPABASE_ANON_KEY ? '✅ OK' : '❌ FALTA');
+    console.log('  SUPABASE_SERVICE_ROLE_KEY:', process.env.SUPABASE_SERVICE_ROLE_KEY ? '✅ OK' : '❌ FALTA');
+  } catch (_) {}
+}
+
 function getSupabaseClient() {
   if (client) return client;
   const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY; // backend/main debe usar service role
+  logEnvDiagnostics();
   if (!url || !key) {
-    throw new Error('Supabase no configurado: faltan SUPABASE_URL y/o clave');
+    throw new Error('❌ Faltan variables de Supabase en .env (SUPABASE_URL y/o SUPABASE_SERVICE_ROLE_KEY)');
   }
-  client = createClient(url, key, { auth: { persistSession: false } });
+  client = createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
   return client;
 }
 
@@ -97,4 +111,21 @@ async function createUserSupabase(username, password, role = 'MESA', activo = tr
   return { success: true };
 }
 
-module.exports = { getSupabaseClient, loginOperatorSupabase, loginUserSupabase, createUserSupabase };
+async function testSupabase() {
+  const supabase = getSupabaseClient();
+  try {
+    console.log('🔄 Probando conexión a Supabase...');
+    const { data, error } = await supabase
+      .from('users')
+      .select('id')
+      .limit(1);
+    if (error) throw error;
+    console.log('✅ Conexión a Supabase OK');
+    return true;
+  } catch (error) {
+    console.error('❌ Error conectando a Supabase:', error?.message || String(error));
+    return false;
+  }
+}
+
+module.exports = { getSupabaseClient, loginOperatorSupabase, loginUserSupabase, createUserSupabase, testSupabase, logEnvDiagnostics };

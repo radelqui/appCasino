@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx claude-code-templates@latest --agent=programming-languages/sql-pro --yes)",
+      "Bash(npm start)",
+      "Bash(npm run start:pure:*)",
+      "Bash(sqlite3:*)",
+      "Bash(node analyze-system.js:*)",
+      "Bash(git checkout:*)",
+      "Bash(git stash:*)",
+      "Bash(tasklist:*)",
+      "Bash(findstr:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
