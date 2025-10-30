@@ -127,7 +127,11 @@
           </div>
           <div class="detail-row">
             <span class="label">Mesa:</span>
-            <span class="value" id="voucher-station">N/A</span>
+            <span class="value" id="voucher-mesa">N/A</span>
+          </div>
+          <div class="detail-row">
+            <span class="label">Operador:</span>
+            <span class="value" id="voucher-operador">N/A</span>
           </div>
         </div>
         <button id="btn-redeem" class="btn-redeem">💰 Canjear y Pagar</button>
@@ -136,7 +140,7 @@
       <div class="footer">Consejo: usa la tecla Enter para validar más rápido.</div>
     </section>
 
-    <section class="card">
+    <section class="card" id="statsCard">
       <h2>Estadísticas de Hoy</h2>
       <div class="list" id="statsList">
         <div class="row"><span class="label">Tickets Hoy</span><span class="value" id="statsTickets">—</span></div>
@@ -172,7 +176,8 @@
     const voucherAmountEl = q('#voucher-amount');
     const voucherCurrencyEl = q('#voucher-currency');
     const voucherIssuedEl = q('#voucher-issued');
-    const voucherStationEl = q('#voucher-station');
+    const voucherMesaEl = q('#voucher-mesa');
+    const voucherOperadorEl = q('#voucher-operador');
     const btnRedeem = q('#btn-redeem');
     const btnCancel = q('#btn-cancel');
 
@@ -196,6 +201,13 @@
       try {
         const role = await window.api?.getRole?.();
         roleBadge.textContent = `Rol: ${role || '—'}`;
+        // Privacidad: ocultar estadísticas a no auditores/admin
+        try {
+          const r = String(role || '').toUpperCase();
+          const statsCard = document.getElementById('statsCard');
+          const canSeeGlobal = (r === 'AUDITOR' || r === 'ADMIN');
+          if (statsCard) statsCard.style.display = canSeeGlobal ? '' : 'none';
+        } catch {}
       } catch { roleBadge.textContent = 'Rol: —'; }
     })();
 
@@ -290,27 +302,43 @@
       try {
         // Usar la validación directa de voucher sin rol
         const res = await window.api?.validateVoucher?.(code);
+        console.log('📥 Respuesta completa de validación:', res);
         if (!res) { addValidationRow('Validación', 'Sin respuesta', 'warn'); hideVoucherInfo(); return; }
         if (res.error || res.success === false || res.valid === false) { addValidationRow('Validación', res.message || res.error || 'Voucher no válido', 'bad'); hideVoucherInfo(); return; }
-        const estado = res.estado || res?.voucher?.status || 'emitido';
-        if (estado === 'emitido' || estado === 'active') {
+        const vObj = res.ticket || res.voucher || {};
+        console.log('🎫 Objeto voucher:', vObj);
+        const estado = res.estado || vObj.estado || vObj.status || 'emitido';
+        console.log('📊 Estado detectado:', estado);
+        // Aceptar múltiples variantes del estado "válido" (español e inglés)
+        const estadoNormalizado = String(estado).toLowerCase();
+        if (estadoNormalizado === 'emitido' || estadoNormalizado === 'active' || estadoNormalizado === 'activo') {
           addValidationRow('Voucher', 'Válido (pendiente)', 'ok');
           // Mostrar información del voucher
-          const v = res.voucher || {};
+          const v = vObj;
           voucherCodeEl.textContent = v.code || code;
           voucherAmountEl.textContent = `${v.currency || ''} ${Number(v.amount || 0).toFixed(2)}`;
           voucherCurrencyEl.textContent = v.currency || '—';
-          voucherIssuedEl.textContent = v.issued_at ? new Date(v.issued_at).toLocaleString('es-DO') : '—';
-          voucherStationEl.textContent = v.station || 'N/A';
+          const issued = v.created_at || v.issued_at;
+          voucherIssuedEl.textContent = issued ? new Date(issued).toLocaleString('es-DO') : '—';
+          voucherMesaEl.textContent = v.mesa || v.station || 'N/A';
+          voucherOperadorEl.textContent = v.operador || v.operator || 'N/A';
+          console.log('✅ Mostrando panel de voucher válido');
+          console.log('   - Código:', v.code);
+          console.log('   - Monto:', v.amount, v.currency);
+          console.log('   - Mesa:', v.mesa);
+          console.log('   - Operador:', v.operador);
           voucherInfo.style.display = 'block';
-          currentVoucher = v;
-        } else if (estado === 'canjeado' || estado === 'redeemed') {
+          currentVoucher = { code: v.code, currency: v.currency, amount: v.amount };
+        } else if (estadoNormalizado === 'canjeado' || estadoNormalizado === 'redeemed' || estadoNormalizado === 'usado') {
           addValidationRow('Voucher', 'Ya canjeado', 'warn');
           hideVoucherInfo();
-        } else if (estado === 'expirado' || estado === 'expired') {
+        } else if (estadoNormalizado === 'expirado' || estadoNormalizado === 'expired') {
           addValidationRow('Voucher', 'Expirado', 'warn');
           hideVoucherInfo();
         } else {
+          console.warn('⚠️  Estado no reconocido:', estado);
+          console.warn('   Estado esperado: "emitido", "active", o "activo"');
+          console.warn('   Estado recibido:', estado);
           addValidationRow('Voucher', estado || 'Desconocido', 'warn');
           hideVoucherInfo();
         }
@@ -354,7 +382,30 @@
 
     // Inicializaciones
     setScannerState(false);
-    refreshStats();
+    try {
+      // Solo refrescar si el panel de estadísticas es visible
+      const statsCard = document.getElementById('statsCard');
+      if (!statsCard || statsCard.style.display !== 'none') {
+        refreshStats();
+      }
+    } catch { refreshStats(); }
+
+    // Sistema de salud anti-cuelgues: cargar indicador visual
+    (async function cargarIndicadorSalud() {
+      try {
+        const response = await fetch('../pure/health-indicator.html');
+        const html = await response.text();
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = html;
+        // Insertar todos los elementos del indicador en el body
+        while (tempDiv.firstChild) {
+          document.body.appendChild(tempDiv.firstChild);
+        }
+        console.log('✅ Indicador de salud cargado');
+      } catch (e) {
+        console.warn('❌ No se pudo cargar indicador de salud:', e.message);
+      }
+    })();
   </script>
   <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 </body>

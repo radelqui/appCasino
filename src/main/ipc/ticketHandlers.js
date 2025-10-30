@@ -37,7 +37,8 @@ function registerTicketHandlers({ db, supabaseSync, printer }) {
         fecha_emision: fechaEmision,
         qr_code: qrResult.qrCode,
         mesa_id: ticketData.mesa_id,
-        usuario_emision: ticketData.usuario_emision
+        usuario_emision: ticketData.usuario_emision,
+        operador_nombre: ticketData.operador_nombre || ticketData.usuario_emision
       });
 
       if (printer && typeof printer.printTicket === 'function') {

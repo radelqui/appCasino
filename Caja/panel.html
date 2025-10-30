@@ -171,6 +171,7 @@
             justify-content: space-around;
             backdrop-filter: blur(10px);
         }
+        .status-bar.hidden { display: none !important; }
 
         .status-item {
             text-align: center;
@@ -258,6 +259,12 @@
             </div>
             <h1>CORAL REEF CASINO</h1>
             <div class="subtitle">Sistema de Gestión de Vouchers</div>
+            <!-- Botón temporal de pruebas: limpiar BD -->
+            <div style="margin-top:16px;">
+              <button onclick="resetearBD()" style="background:#dc2626; color:white; padding:10px 14px; border:none; border-radius:8px; cursor:pointer; box-shadow:0 4px 12px rgba(220,38,38,.35);">
+                🗑️ LIMPIAR BD (PRUEBAS)
+              </button>
+            </div>
         </div>
 
         <div class="grid">
@@ -334,6 +341,21 @@
     <!-- Modal Login Caja eliminado: acceso controlado por rol global -->
 
     <script>
+        async function resetearBD(){
+            try {
+                if (!confirm('¿Seguro que quieres ELIMINAR todos los tickets?')) return;
+                const result = await (window.api?.resetDatabase?.() || window.api?.invoke?.('reset-database'));
+                if (result?.success) {
+                    alert('✅ Base de datos limpiada');
+                    try { await loadStats(); } catch {}
+                    location.reload();
+                } else {
+                    alert('❌ Error: ' + (result?.error || 'Desconocido'));
+                }
+            } catch (e) {
+                alert('❌ Error: ' + (e?.message || e));
+            }
+        }
         // Navegación
         async function openView(view) {
             // Requiere sesión activa antes de navegar
@@ -407,6 +429,10 @@
                 cajaCard?.classList.toggle('disabled', !(role === 'CAJA' || role === 'ADMIN'));
                 auditoriaCard?.classList.toggle('disabled', !(role === 'AUDITOR' || role === 'ADMIN'));
                 configCard?.classList.toggle('disabled', !(role === 'ADMIN'));
+                // Privacidad: ocultar barra de estado a no auditores/admin
+                const statusBar = document.querySelector('.status-bar');
+                const canSeeGlobal = (role === 'AUDITOR' || role === 'ADMIN');
+                statusBar?.classList.toggle('hidden', !canSeeGlobal);
             } catch (e) {
                 console.warn('No se pudo determinar rol:', e.message);
             }
@@ -475,11 +501,11 @@
           </div>
           <div style="display:flex; gap:10px; margin-top:16px;">
             <button id="btnLoginApp" onclick="attemptLoginApp()" style="flex:1; padding:10px 14px; background:linear-gradient(135deg,#667eea,#764ba2); color:#fff; border:none; border-radius:10px; box-shadow:0 6px 14px rgba(118,75,162,.3);">Ingresar</button>
-            <button onclick="hideLoginApp()" style="padding:10px 14px; background:#ffffff; color:#374151; border:1px solid #e5e7eb; border-radius:10px;">Cancelar</button>
+            <button onclick="exitApp()" style="padding:10px 14px; background:#ffffff; color:#374151; border:1px solid #e5e7eb; border-radius:10px;">Salir</button>
           </div>
           <p id="loginAppError" class="muted" style="color:#c0392b; display:none; margin-top:10px; font-size:12px;">Error de autenticación</p>
           <div style="margin-top:14px; color:#6b7280; font-size:11px;">
-            <span>Modo local offline habilitado por defecto.</span>
+            <span>Autenticación requerida para continuar.</span>
           </div>
         </div>
       </div>
@@ -564,6 +590,14 @@
           const r = String(role||'MESA').toUpperCase();
           // ejemplo: document.querySelector('#cardCaja')?.classList.toggle('hidden', !(r==='CAJA'||r==='ADMIN'));
         } catch {}
+      }
+      async function exitApp(){
+        console.log('[panel] exitApp - Cerrando aplicación');
+        try {
+          await window.api?.invoke?.('exit-app');
+        } catch(e) {
+          console.error('[panel] Error cerrando app:', e);
+        }
       }
       document.addEventListener('DOMContentLoaded', checkSessionAndPrompt);
 

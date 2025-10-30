@@ -8,6 +8,8 @@ contextBridge.exposeInMainWorld('api', {
   validateTicket: (qrString) => ipcRenderer.invoke('validate-ticket', qrString),
   processPayment: (paymentData) => ipcRenderer.invoke('process-payment', paymentData),
   getStats: (dateRange) => ipcRenderer.invoke('get-stats', dateRange),
+  // Compat: estadísticas del día para Panel
+  getStatsToday: () => ipcRenderer.invoke('get-stats-today'),
   forceSync: () => ipcRenderer.invoke('force-sync'),
   testPrinter: () => ipcRenderer.invoke('test-print'),
   testCalibration: () => ipcRenderer.invoke('test-calibration'),
@@ -16,6 +18,10 @@ contextBridge.exposeInMainWorld('api', {
   getTicketPreview: (previewData) => ipcRenderer.invoke('get-ticket-preview', previewData),
   printVoucher: (voucher) => ipcRenderer.invoke('print-voucher', voucher),
   listVouchers: () => ipcRenderer.invoke('list-vouchers'),
+  // --- Utilidades de pruebas / mantenimiento ---
+  resetDatabase: () => ipcRenderer.invoke('reset-database'),
+  // Genérico (comodín) para invocar cualquier canal por nombre
+  invoke: (channel, ...args) => ipcRenderer.invoke(channel, ...args),
   // --- Vouchers (expuestos para Panel y vistas con este preload) ---
   validateVoucher: (code) => ipcRenderer.invoke('validate-voucher', code),
   redeemVoucher: (code) => ipcRenderer.invoke('redeem-voucher', code),
@@ -31,7 +37,8 @@ contextBridge.exposeInMainWorld('api', {
   navigateTo: (view) => ipcRenderer.invoke('open-view', view),
   focusPanel: () => ipcRenderer.invoke('focus-panel'),
   closeCurrent: () => ipcRenderer.invoke('close-current'),
-  exitApp: () => ipcRenderer.invoke('close-current'),
+  backToPanel: () => ipcRenderer.invoke('back-to-panel'),
+  exitApp: () => ipcRenderer.invoke('exit-app'),
   onQrScanned: (callback) => {
     const subscription = (event, ...args) => callback(...args);
     ipcRenderer.on('qr-scanned', subscription);

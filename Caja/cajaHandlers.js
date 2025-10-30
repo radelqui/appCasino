@@ -156,6 +156,21 @@ function registerCajaHandlers() {
             if (voucher.expires_at && new Date(voucher.expires_at) < new Date()) {
                 return { success: false, error: 'Voucher expirado', valid: false, estado: 'expirado', message: 'Voucher expirado' };
             }
+            // Enriquecer con mesa y operador desde tickets
+            let mesa = 'N/A';
+            let operador = 'N/A';
+            try {
+                const t = db.getTicket ? db.getTicket(voucher.voucher_code) : null;
+                if (t) {
+                    mesa = t.mesa_nombre || t.mesa || (t.mesa_id ? String(t.mesa_id) : 'N/A');
+                    operador = t.created_by_username || t.operador_nombre || t.usuario_emision || t.created_by_email || t.operador_email || 'N/A';
+                }
+                console.log('  - Mesa:', mesa);
+                console.log('  - Operador:', operador);
+            } catch (e) {
+                console.warn('No se pudo obtener mesa/operador:', e?.message);
+            }
+
             return {
                 success: true,
                 valid: true,
@@ -165,7 +180,9 @@ function registerCajaHandlers() {
                     amount: voucher.amount,
                     currency: voucher.currency,
                     issued_at: voucher.issued_at,
-                    status: voucher.status
+                    status: voucher.status,
+                    mesa: mesa,
+                    operador: operador
                 }
             };
         } catch (error) {

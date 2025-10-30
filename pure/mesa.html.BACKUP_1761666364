@@ -46,9 +46,7 @@
         </div>
         <div class="col">
           <div class="label">Emitido por</div>
-          <select id="usuario" class="input">
-            <option value="">Seleccione operador...</option>
-          </select>
+          <input id="usuario" class="input" value="Operador" />
         </div>
       </div>
       <div style="margin-top:12px">
@@ -115,52 +113,12 @@
     async function emitir(){
       const valor = parseFloat(document.getElementById('valor').value || '0');
       const moneda = document.getElementById('moneda').value || 'DOP';
-      const mesaNombre = document.getElementById('mesa').value || 'P03';
-      const operadorNombre = document.getElementById('usuario').value;
-
-      // ✅ VALIDACIÓN: Operador es requerido
-      if (!operadorNombre) {
-        msg('❌ Debe seleccionar un operador', false);
-        return;
-      }
-
-      // ✅ VALIDACIÓN: Valor debe ser mayor a 0
-      if (valor <= 0) {
-        msg('❌ El valor debe ser mayor a 0', false);
-        return;
-      }
-
-      const mesa_id = mesaNombre; // compat: campo antiguo
-      const usuario_emision = operadorNombre; // compat: campo antiguo
+      const mesa_id = document.getElementById('mesa').value || 'P01';
+      const usuario_emision = document.getElementById('usuario').value || 'Operador';
       try {
         if (!window.api?.generateTicket) throw new Error('API de Electron no disponible');
-
-        // 1. Emitir voucher: enviar claves nuevas y mantener compatibilidad
-        const ticketData = {
-          amount: Number(valor),
-          currency: String(moneda),
-          mesa_nombre: mesaNombre,
-          operador_nombre: operadorNombre,
-          valor: Number(valor),
-          moneda: String(moneda),
-          mesa_id,
-          usuario_emision
-        };
-        console.log('📤 Enviando datos:', ticketData);
-        const result = await window.api.generateTicket(ticketData);
-
-        const code = result?.ticket?.code || result?.ticket_number;
-        console.log('✅ Voucher emitido:', code);
-
-        // 2. Mostrar mensaje
-        const monedaShow = result?.ticket?.currency || result?.moneda || moneda;
-        const valorShow = typeof result?.ticket?.amount === 'number' ? result.ticket.amount : (result?.valor ?? valor);
-        msg(`Emitido ticket ${code} (${monedaShow} ${Number(valorShow).toFixed(2)})`);
-
-        // 3. ACTUALIZAR vista previa con el código del voucher emitido
-        console.log('🔄 Actualizando vista previa con código:', code);
-        await actualizarVistaPrevia(code);
-
+        const result = await window.api.generateTicket({ valor, moneda, mesa_id, usuario_emision });
+        msg(`Emitido ticket ${result.ticket_number} (${result.moneda} ${Number(result.valor).toFixed(2)})`);
       } catch(e) {
         console.error(e); msg(`Error: ${e.message}`, false);
       }
@@ -191,69 +149,31 @@
         else msg('Perfil actualizado localmente');
       } catch(e) { msg(`Error guardando perfil: ${e.message}`, false); }
     }
-    async function vistaPrevia(voucherCode = null){
+    async function vistaPrevia(){
       try {
         const valor = parseFloat(document.getElementById('valor').value || '0');
         const moneda = document.getElementById('moneda').value || 'DOP';
         const mesa_id = document.getElementById('mesa').value || 'P01';
         const usuario_emision = document.getElementById('usuario').value || 'VistaPrevia';
-
-        const payload = {
-          valor,
-          moneda,
-          mesa_id,
-          usuario_emision,
-          pageWidthMm: Number(widthEl?.value || 80),
-          pageHeightMm: Number(heightEl?.value || 156)
-        };
-
-        // Si se proporciona un código de voucher, usarlo
-        if (voucherCode) {
-          payload.ticket_number = voucherCode;
-          console.log('📄 Vista previa con código:', voucherCode);
+        const payload = { valor, moneda, mesa_id, usuario_emision, pageWidthMm: Number(widthEl.value || 80), pageHeightMm: Number(heightEl.value || 156) };
+        const resp = await window.api?.getTicketPreview?.(payload);
+        if (resp?.success && resp.dataUrl && previewTicketEl) { previewTicketEl.src = resp.dataUrl; }
+        else {
+          const qs = new URLSearchParams({ valor: String(valor || '123.45'), moneda, ancho: String(widthEl.value || '80'), alto: String(heightEl.value || '156'), mesa_id, usuario_emision });
+          if (previewTicketEl) { previewTicketEl.src = `http://localhost:8088/voucher.pdf?${qs.toString()}`; }
         }
-
-        // ⚠️ FIX: Añadir timeout para evitar bloqueos si el handler no responde
-        const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Timeout en getTicketPreview')), 3000)
-        );
-
-        try {
-          const resp = await Promise.race([
-            window.api?.getTicketPreview?.(payload),
-            timeoutPromise
-          ]);
-
-          if (resp?.success && resp.dataUrl && previewTicketEl) {
-            previewTicketEl.src = resp.dataUrl;
-            console.log('✅ Vista previa actualizada:', resp.voucher_code || 'sin código');
-            return; // Salir si tuvo éxito
-          }
-        } catch (apiError) {
-          console.warn('⚠️ API getTicketPreview no disponible o timeout:', apiError.message);
-        }
-
-        // Fallback: usar URL directa
-        const qs = new URLSearchParams({
-          valor: String(valor || '123.45'),
-          moneda,
-          ancho: String(widthEl?.value || '80'),
-          alto: String(heightEl?.value || '156'),
-          mesa_id,
-          usuario_emision,
-          ticket_number: voucherCode || ''
-        });
-        if (previewTicketEl) {
-          previewTicketEl.src = `http://localhost:8088/voucher.pdf?${qs.toString()}`;
-          console.log('📄 Usando fallback URL para vista previa');
-        }
-      } catch(e) {
-        console.warn('Vista previa fallback error:', e.message);
-      }
+      } catch(e) { console.warn('Vista previa fallback', e.message); }
     }
     // Vista previa directa en Mesa según valor/moneda (altura automática)
-    async function actualizarVistaPrevia(voucherCode = null){
-      try { await vistaPrevia(voucherCode); } catch(e) { console.warn('Actualizar vista previa falló:', e.message); }
+    function actualizarVistaPrevia(){
+      try {
+        const valor = parseFloat(document.getElementById('valor').value || '0');
+        const moneda = document.getElementById('moneda').value || 'DOP';
+        const mesa_id = document.getElementById('mesa').value || 'P01';
+        const usuario_emision = document.getElementById('usuario').value || 'VistaPrevia';
+        const qs = new URLSearchParams({ valor: String(valor || '0'), moneda, ancho: '80', mesa_id, usuario_emision });
+        if (previewTicketEl) previewTicketEl.src = `http://localhost:8088/voucher.pdf?${qs.toString()}`;
+      } catch(e) { console.warn('No se pudo actualizar la vista previa en Mesa:', e.message); }
     }
 
     function imprimir(){
@@ -282,46 +202,10 @@
     document.getElementById('vista').addEventListener('click', vistaPrevia);
     document.getElementById('imprimir').addEventListener('click', imprimir);
 
-    // ============================================
-    // CARGAR OPERADORES desde Supabase
-    // ============================================
-    async function cargarOperadores() {
-      try {
-        console.log('📋 Cargando operadores activos...');
-        const result = await window.api?.invoke?.('get-operadores-activos');
-
-        if (!result) {
-          console.warn('⚠️ API no disponible - modo offline');
-          return;
-        }
-
-        if (result.success && result.operadores) {
-          const select = document.getElementById('usuario');
-
-          // Limpiar opciones anteriores
-          select.innerHTML = '<option value="">Seleccione operador...</option>';
-
-          // Agregar operadores activos
-          result.operadores.forEach(op => {
-            const option = document.createElement('option');
-            option.value = op.nombre; // Guardamos el nombre para el ticket
-            option.textContent = op.nombre;
-            select.appendChild(option);
-          });
-
-          console.log(`✅ ${result.operadores.length} operadores cargados`);
-        } else {
-          console.warn('⚠️ No se pudieron cargar operadores:', result?.error);
-        }
-      } catch (error) {
-        console.error('❌ Error cargando operadores:', error);
-      }
-    }
-
     // Init
     cargarPerfil().then(vistaPrevia);
+    cargarPerfil().then(vistaPrevia);
     actualizarVistaPrevia();
-    cargarOperadores(); // Cargar operadores al iniciar
 
     ['valor','moneda','mesa','usuario'].forEach(id => {
       const el = document.getElementById(id);
@@ -343,23 +227,6 @@
         }
       } catch (e) {
         console.warn('Restricciones por rol no aplicadas:', e.message);
-      }
-    })();
-
-    // Sistema de salud anti-cuelgues: cargar indicador visual
-    (async function cargarIndicadorSalud() {
-      try {
-        const response = await fetch('health-indicator.html');
-        const html = await response.text();
-        const tempDiv = document.createElement('div');
-        tempDiv.innerHTML = html;
-        // Insertar todos los elementos del indicador en el body
-        while (tempDiv.firstChild) {
-          document.body.appendChild(tempDiv.firstChild);
-        }
-        console.log('✅ Indicador de salud cargado');
-      } catch (e) {
-        console.warn('❌ No se pudo cargar indicador de salud:', e.message);
       }
     })();
   </script>

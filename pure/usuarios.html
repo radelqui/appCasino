@@ -1,0 +1,492 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gestión de Usuarios</title>
+  <link rel="stylesheet" href="./style.css" />
+  <style>
+    body{font-family:system-ui,Segoe UI,Arial;background:#0b1220;color:#e5e7eb}
+    .card{background:#0f172a;border:1px solid #1f2937;border-radius:12px;padding:16px;max-width:1200px;margin:16px auto}
+    .button{padding:10px 14px;border-radius:8px;border:1px solid #334155;background:#1f2937;color:#e5e7eb;cursor:pointer;margin:4px;font-size:14px}
+    .button:hover{background:#2d3748}
+    .button.primary{background:#3b82f6;border-color:#3b82f6}
+    .button.primary:hover{background:#2563eb}
+    .button.danger{background:#ef4444;border-color:#ef4444}
+    .button.danger:hover{background:#dc2626}
+    .button.success{background:#10b981;border-color:#10b981}
+    .button.success:hover{background:#059669}
+    table{width:100%;border-collapse:collapse;margin-top:16px}
+    thead{background:#111827}
+    th{padding:12px;text-align:left;border-bottom:2px solid #334155;font-size:13px;text-transform:uppercase;color:#9ca3af}
+    td{padding:12px;border-bottom:1px solid #1f2937}
+    tbody tr:hover{background:#111827}
+    .modal{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:1000;align-items:center;justify-content:center}
+    .modal.show{display:flex}
+    .modal-content{background:#0f172a;border:1px solid #334155;border-radius:12px;padding:24px;max-width:500px;width:90%;max-height:90vh;overflow-y:auto}
+    .modal-title{font-size:20px;font-weight:600;margin-bottom:16px}
+    .input,.select{width:100%;padding:10px;border-radius:8px;border:1px solid #334155;background:#111827;color:#e5e7eb;margin:8px 0;font-size:14px}
+    .form-group{margin:12px 0}
+    .form-group label{display:block;margin-bottom:6px;color:#9ca3af;font-size:13px;font-weight:500}
+    .status{margin-left:12px;font-size:14px}
+    .badge{display:inline-block;padding:4px 8px;border-radius:4px;font-size:11px;font-weight:600}
+    .badge.active{background:#10b98120;color:#10b981}
+    .badge.inactive{background:#ef444420;color:#ef4444}
+    .badge.admin{background:#3b82f620;color:#3b82f6}
+    .badge.mesa{background:#10b98120;color:#10b981}
+    .badge.caja{background:#f59e0b20;color:#f59e0b}
+    .badge.auditor{background:#6366f120;color:#6366f1}
+    header{background:#0f172a;border-bottom:1px solid #1f2937;padding:16px 24px;display:flex;justify-content:space-between;align-items:center}
+    header h1{margin:0;font-size:24px}
+    footer{text-align:center;padding:20px;color:#6b7280;font-size:13px;border-top:1px solid #1f2937;margin-top:40px}
+    .help-text{font-size:12px;color:#6b7280;margin-top:4px}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>👨‍💼 Gestión de Usuarios</h1>
+    <nav>
+      <button class="button" id="btnVolver">← Volver a Configuración</button>
+    </nav>
+  </header>
+
+  <main>
+    <section class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <div>
+          <h2 style="margin:0">Usuarios del Sistema</h2>
+          <p style="color:#9ca3af;margin:4px 0 0 0;font-size:14px">Gestiona usuarios con diferentes roles y permisos</p>
+        </div>
+        <button class="button primary" id="btnNuevo">➕ Agregar Usuario</button>
+      </div>
+      <span id="status" class="status"></span>
+    </section>
+
+    <section class="card">
+      <div style="overflow-x:auto">
+        <table>
+          <thead>
+            <tr>
+              <th>Email</th>
+              <th>Nombre</th>
+              <th>Rol</th>
+              <th>PIN</th>
+              <th>Estado</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="tabla-usuarios">
+            <tr>
+              <td colspan="6" style="text-align:center;color:#9ca3af;padding:40px">Cargando usuarios...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <small>Sistema TITO · Gestión de Usuarios</small>
+  </footer>
+
+  <!-- Modal para Agregar/Editar Usuario -->
+  <div id="modal-usuario" class="modal">
+    <div class="modal-content">
+      <h3 class="modal-title" id="modal-title">Nuevo Usuario</h3>
+
+      <div class="form-group">
+        <label>Email *</label>
+        <input type="email" id="email-usuario" class="input" placeholder="usuario@ejemplo.com" />
+        <div class="help-text">Utilizado para inicio de sesión</div>
+      </div>
+
+      <div class="form-group">
+        <label>Nombre Completo *</label>
+        <input type="text" id="nombre-usuario" class="input" placeholder="Ej: Juan Pérez" />
+      </div>
+
+      <div class="form-group">
+        <label>Rol *</label>
+        <select id="rol-usuario" class="select">
+          <option value="">Seleccione un rol...</option>
+          <option value="ADMIN">ADMIN - Administrador (acceso total)</option>
+          <option value="MESA">MESA - Operador (genera tickets)</option>
+          <option value="CAJA">CAJA - Cajero (valida y canjea)</option>
+          <option value="AUDITOR">AUDITOR - Auditor (solo lectura)</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>PIN (4 dígitos)</label>
+        <input type="text" id="pin-usuario" class="input" placeholder="1234" maxlength="4" />
+        <div class="help-text">Opcional. PIN numérico de 4 dígitos para acceso rápido</div>
+      </div>
+
+      <div class="form-group" id="password-group">
+        <label>Contraseña *</label>
+        <input type="password" id="password-usuario" class="input" placeholder="********" />
+        <div class="help-text">Mínimo 6 caracteres. Requerido al crear nuevo usuario</div>
+      </div>
+
+      <div style="margin-top:20px;display:flex;gap:8px;justify-content:flex-end">
+        <button class="button" id="btnCancelar">Cancelar</button>
+        <button class="button primary" id="btnGuardar">Guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal para Cambiar Contraseña -->
+  <div id="modal-password" class="modal">
+    <div class="modal-content">
+      <h3 class="modal-title">Cambiar Contraseña</h3>
+
+      <div class="form-group">
+        <label>Usuario</label>
+        <input type="text" id="password-email" class="input" disabled />
+      </div>
+
+      <div class="form-group">
+        <label>Nueva Contraseña *</label>
+        <input type="password" id="nueva-password" class="input" placeholder="********" />
+        <div class="help-text">Mínimo 6 caracteres</div>
+      </div>
+
+      <div class="form-group">
+        <label>Confirmar Contraseña *</label>
+        <input type="password" id="confirmar-password" class="input" placeholder="********" />
+      </div>
+
+      <div style="margin-top:20px;display:flex;gap:8px;justify-content:flex-end">
+        <button class="button" id="btnCancelarPassword">Cancelar</button>
+        <button class="button primary" id="btnGuardarPassword">Cambiar Contraseña</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const statusEl = document.getElementById('status');
+    function msg(text, ok=true){
+      statusEl.textContent = text;
+      statusEl.style.color = ok? '#10b981' : '#ef4444';
+      setTimeout(() => statusEl.textContent = '', 5000);
+    }
+
+    let usuarioEditando = null; // Para modo edición
+    let usuarioPassword = null; // Para cambio de contraseña
+
+    // ============================================
+    // CARGAR USUARIOS
+    // ============================================
+    async function cargarUsuarios() {
+      try {
+        console.log('👨‍💼 Cargando usuarios...');
+        const result = await window.api?.invoke?.('get-all-users');
+
+        if (!result) {
+          msg('❌ API no disponible', false);
+          return;
+        }
+
+        if (result.success && result.users) {
+          mostrarUsuarios(result.users);
+          msg(`✅ ${result.users.length} usuarios cargados`, true);
+        } else {
+          msg('❌ Error: ' + (result.error || 'Desconocido'), false);
+          document.getElementById('tabla-usuarios').innerHTML =
+            '<tr><td colspan="6" style="text-align:center;color:#ef4444;padding:40px">Error cargando usuarios</td></tr>';
+        }
+      } catch (error) {
+        console.error('❌ Error cargando usuarios:', error);
+        msg('❌ Error cargando usuarios', false);
+      }
+    }
+
+    // ============================================
+    // MOSTRAR USUARIOS EN TABLA
+    // ============================================
+    function mostrarUsuarios(users) {
+      const tbody = document.getElementById('tabla-usuarios');
+
+      if (users.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#9ca3af;padding:40px">No hay usuarios registrados</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = users.map(user => {
+        const roleBadge = getRoleBadge(user.role);
+        const statusBadge = user.is_active
+          ? '<span class="badge active">Activo</span>'
+          : '<span class="badge inactive">Inactivo</span>';
+        const pinDisplay = user.pin_code ? `****${user.pin_code.slice(-1)}` : '-';
+
+        return `
+          <tr>
+            <td>${user.email}</td>
+            <td>${user.full_name || '-'}</td>
+            <td>${roleBadge}</td>
+            <td style="font-family:monospace">${pinDisplay}</td>
+            <td>${statusBadge}</td>
+            <td>
+              <button class="button" onclick="editarUsuario('${user.id}')">✏️ Editar</button>
+              ${user.is_active ?
+                `<button class="button danger" onclick="toggleUsuario('${user.id}', false)">🗑️ Desactivar</button>` :
+                `<button class="button success" onclick="toggleUsuario('${user.id}', true)">✅ Activar</button>`
+              }
+              <button class="button" onclick="cambiarPassword('${user.id}', '${user.email}')">🔑 Contraseña</button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function getRoleBadge(role) {
+      // ✅ Convertir a mayúsculas para display (DB guarda en minúsculas)
+      const roleUpper = role?.toUpperCase();
+      const badges = {
+        'ADMIN': '<span class="badge admin">ADMIN</span>',
+        'MESA': '<span class="badge mesa">MESA</span>',
+        'CAJA': '<span class="badge caja">CAJA</span>',
+        'AUDITOR': '<span class="badge auditor">AUDITOR</span>'
+      };
+      return badges[roleUpper] || `<span class="badge">${roleUpper || role}</span>`;
+    }
+
+    // ============================================
+    // NUEVO USUARIO
+    // ============================================
+    document.getElementById('btnNuevo').addEventListener('click', () => {
+      usuarioEditando = null;
+      document.getElementById('modal-title').textContent = 'Nuevo Usuario';
+      document.getElementById('email-usuario').value = '';
+      document.getElementById('email-usuario').disabled = false;
+      document.getElementById('nombre-usuario').value = '';
+      document.getElementById('rol-usuario').value = '';
+      document.getElementById('pin-usuario').value = '';
+      document.getElementById('password-usuario').value = '';
+      document.getElementById('password-group').style.display = 'block';
+      document.getElementById('modal-usuario').classList.add('show');
+    });
+
+    // ============================================
+    // EDITAR USUARIO
+    // ============================================
+    async function editarUsuario(userId) {
+      try {
+        const result = await window.api?.invoke?.('get-all-users');
+        if (!result?.success) return;
+
+        const user = result.users.find(u => u.id === userId);
+        if (!user) {
+          msg('❌ Usuario no encontrado', false);
+          return;
+        }
+
+        usuarioEditando = user;
+        document.getElementById('modal-title').textContent = 'Editar Usuario';
+        document.getElementById('email-usuario').value = user.email;
+        document.getElementById('email-usuario').disabled = true; // No permitir cambiar email
+        document.getElementById('nombre-usuario').value = user.full_name || '';
+        // ✅ Convertir role a mayúsculas para el dropdown (DB guarda en minúsculas)
+        document.getElementById('rol-usuario').value = user.role?.toUpperCase() || '';
+        document.getElementById('pin-usuario').value = user.pin_code || '';
+        document.getElementById('password-usuario').value = '';
+        document.getElementById('password-group').style.display = 'none'; // Ocultar contraseña en edición
+        document.getElementById('modal-usuario').classList.add('show');
+      } catch (error) {
+        console.error('Error cargando usuario:', error);
+        msg('❌ Error cargando usuario', false);
+      }
+    }
+
+    // ============================================
+    // GUARDAR USUARIO
+    // ============================================
+    document.getElementById('btnGuardar').addEventListener('click', async () => {
+      const email = document.getElementById('email-usuario').value.trim();
+      const nombre = document.getElementById('nombre-usuario').value.trim();
+      const rol = document.getElementById('rol-usuario').value;
+      const pin = document.getElementById('pin-usuario').value.trim();
+      const password = document.getElementById('password-usuario').value;
+
+      // Validaciones
+      if (!email) {
+        msg('❌ Email es requerido', false);
+        return;
+      }
+      if (!nombre) {
+        msg('❌ Nombre es requerido', false);
+        return;
+      }
+      if (!rol) {
+        msg('❌ Rol es requerido', false);
+        return;
+      }
+      if (pin && !/^\d{4}$/.test(pin)) {
+        msg('❌ PIN debe ser 4 dígitos numéricos', false);
+        return;
+      }
+      if (!usuarioEditando && !password) {
+        msg('❌ Contraseña es requerida para nuevo usuario', false);
+        return;
+      }
+      if (password && password.length < 6) {
+        msg('❌ Contraseña debe tener mínimo 6 caracteres', false);
+        return;
+      }
+
+      try {
+        const userData = {
+          email,
+          full_name: nombre,
+          role: rol,
+          pin_code: pin || null
+        };
+
+        let result;
+        if (usuarioEditando) {
+          // Actualizar
+          result = await window.api?.invoke?.('update-user', usuarioEditando.id, userData);
+        } else {
+          // Crear nuevo
+          userData.password = password;
+          result = await window.api?.invoke?.('create-user', userData);
+        }
+
+        if (result?.success) {
+          msg(`✅ Usuario ${usuarioEditando ? 'actualizado' : 'creado'} exitosamente`, true);
+          document.getElementById('modal-usuario').classList.remove('show');
+          cargarUsuarios();
+        } else {
+          msg('❌ Error: ' + (result?.error || 'Desconocido'), false);
+        }
+      } catch (error) {
+        console.error('Error guardando usuario:', error);
+        msg('❌ Error guardando usuario', false);
+      }
+    });
+
+    // ============================================
+    // ACTIVAR/DESACTIVAR USUARIO
+    // ============================================
+    async function toggleUsuario(userId, activo) {
+      const accion = activo ? 'activar' : 'desactivar';
+      if (!confirm(`¿${accion.charAt(0).toUpperCase() + accion.slice(1)} este usuario?`)) {
+        return;
+      }
+
+      try {
+        const result = await window.api?.invoke?.('toggle-user', userId, activo);
+        if (result?.success) {
+          msg(`✅ Usuario ${activo ? 'activado' : 'desactivado'} exitosamente`, true);
+          cargarUsuarios();
+        } else {
+          msg('❌ Error: ' + (result?.error || 'Desconocido'), false);
+        }
+      } catch (error) {
+        console.error('Error cambiando estado:', error);
+        msg('❌ Error cambiando estado', false);
+      }
+    }
+
+    // ============================================
+    // CAMBIAR CONTRASEÑA
+    // ============================================
+    function cambiarPassword(userId, email) {
+      usuarioPassword = userId;
+      document.getElementById('password-email').value = email;
+      document.getElementById('nueva-password').value = '';
+      document.getElementById('confirmar-password').value = '';
+      document.getElementById('modal-password').classList.add('show');
+    }
+
+    document.getElementById('btnGuardarPassword').addEventListener('click', async () => {
+      const nuevaPassword = document.getElementById('nueva-password').value;
+      const confirmarPassword = document.getElementById('confirmar-password').value;
+
+      if (!nuevaPassword || nuevaPassword.length < 6) {
+        msg('❌ Contraseña debe tener mínimo 6 caracteres', false);
+        return;
+      }
+
+      if (nuevaPassword !== confirmarPassword) {
+        msg('❌ Las contraseñas no coinciden', false);
+        return;
+      }
+
+      try {
+        const result = await window.api?.invoke?.('change-user-password', usuarioPassword, nuevaPassword);
+        if (result?.success) {
+          msg('✅ Contraseña actualizada exitosamente', true);
+          document.getElementById('modal-password').classList.remove('show');
+        } else {
+          msg('❌ Error: ' + (result?.error || 'Desconocido'), false);
+        }
+      } catch (error) {
+        console.error('Error cambiando contraseña:', error);
+        msg('❌ Error cambiando contraseña', false);
+      }
+    });
+
+    // ============================================
+    // CERRAR MODALES
+    // ============================================
+    document.getElementById('btnCancelar').addEventListener('click', () => {
+      document.getElementById('modal-usuario').classList.remove('show');
+    });
+
+    document.getElementById('btnCancelarPassword').addEventListener('click', () => {
+      document.getElementById('modal-password').classList.remove('show');
+    });
+
+    // Cerrar modal al hacer click fuera
+    document.getElementById('modal-usuario').addEventListener('click', (e) => {
+      if (e.target.id === 'modal-usuario') {
+        document.getElementById('modal-usuario').classList.remove('show');
+      }
+    });
+
+    document.getElementById('modal-password').addEventListener('click', (e) => {
+      if (e.target.id === 'modal-password') {
+        document.getElementById('modal-password').classList.remove('show');
+      }
+    });
+
+    // ============================================
+    // NAVEGACIÓN
+    // ============================================
+    document.getElementById('btnVolver').addEventListener('click', async () => {
+      console.log('🔙 Volviendo a configuración...');
+      try {
+        await window.api?.invoke?.('open-view', 'config');
+      } catch (error) {
+        console.error('Error volviendo a config:', error);
+      }
+    });
+
+    // ============================================
+    // INICIALIZACIÓN
+    // ============================================
+    document.addEventListener('DOMContentLoaded', () => {
+      console.log('👨‍💼 Módulo de Gestión de Usuarios iniciado');
+      cargarUsuarios();
+    });
+
+    // Sistema de salud anti-cuelgues: cargar indicador visual
+    (async function cargarIndicadorSalud() {
+      try {
+        const response = await fetch('health-indicator.html');
+        const html = await response.text();
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = html;
+        while (tempDiv.firstChild) {
+          document.body.appendChild(tempDiv.firstChild);
+        }
+        console.log('✅ Indicador de salud cargado');
+      } catch (e) {
+        console.warn('❌ No se pudo cargar indicador de salud:', e.message);
+      }
+    })();
+  </script>
+</body>
+</html>

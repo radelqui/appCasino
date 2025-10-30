@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Configuración - Sistema TITO</title>
+  <link rel="stylesheet" href="./style.css" />
+  <style>
+    body{font-family:system-ui,Segoe UI,Arial;background:#0b1220;color:#e5e7eb;margin:0;padding:0}
+    .container{max-width:1200px;margin:0 auto;padding:20px}
+    .card{background:#0f172a;border:1px solid #1f2937;border-radius:12px;padding:24px;margin:16px 0}
+    .card h2{margin-top:0;color:#3b82f6;font-size:24px}
+    .card p{color:#9ca3af;margin:8px 0 20px 0}
+    .config-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:20px;margin-top:24px}
+    .config-item{background:#111827;border:1px solid #334155;border-radius:10px;padding:20px;cursor:pointer;transition:all 0.3s ease}
+    .config-item:hover{background:#1f2937;border-color:#3b82f6;transform:translateY(-2px);box-shadow:0 4px 12px rgba(59,130,246,0.2)}
+    .config-icon{font-size:36px;margin-bottom:12px}
+    .config-title{font-size:18px;font-weight:600;margin-bottom:8px;color:#e5e7eb}
+    .config-desc{font-size:14px;color:#9ca3af;line-height:1.5}
+    .button{padding:10px 16px;border-radius:8px;border:1px solid #334155;background:#1f2937;color:#e5e7eb;cursor:pointer;font-size:14px;font-weight:500}
+    .button:hover{background:#2d3748}
+    .button.primary{background:#3b82f6;border-color:#3b82f6}
+    .button.primary:hover{background:#2563eb}
+    header{background:#0f172a;border-bottom:1px solid #1f2937;padding:16px 24px;display:flex;justify-content:space-between;align-items:center}
+    header h1{margin:0;font-size:24px}
+    .badge{display:inline-block;padding:4px 10px;border-radius:12px;font-size:12px;font-weight:600;margin-left:8px}
+    .badge.admin{background:#3b82f620;color:#3b82f6}
+    .badge.soon{background:#f59e0b20;color:#f59e0b}
+    .badge.active{background:#10b98120;color:#10b981}
+    footer{text-align:center;padding:20px;color:#6b7280;font-size:13px;border-top:1px solid #1f2937;margin-top:40px}
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>⚙️ Configuración del Sistema <span class="badge admin">Solo Administrador</span></h1>
+      <p style="margin:4px 0 0 0;color:#9ca3af;font-size:14px">Gestión y configuración general del sistema TITO</p>
+    </div>
+    <nav>
+      <button class="button" id="btnVolver">← Volver al Panel</button>
+    </nav>
+  </header>
+
+  <main class="container">
+    <!-- Gestión de Operadores -->
+    <section class="card">
+      <h2>👥 Gestión de Operadores</h2>
+      <p>Administra los operadores del casino que pueden emitir tickets desde las mesas</p>
+
+      <div class="config-grid">
+        <div class="config-item" onclick="abrirOperadores()">
+          <div class="config-icon">👤</div>
+          <div class="config-title">Operadores <span class="badge active">Activo</span></div>
+          <div class="config-desc">
+            Crear, editar, activar/desactivar operadores.
+            Asignar mesas específicas a cada operador.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Configuración del Sistema (Próximamente) -->
+    <section class="card">
+      <h2>🔧 Configuración del Sistema</h2>
+      <p>Ajustes generales del sistema, base de datos, e impresoras</p>
+
+      <div class="config-grid">
+        <div class="config-item" onclick="abrirUsuarios()">
+          <div class="config-icon">👨‍💼</div>
+          <div class="config-title">Usuarios del Sistema <span class="badge active">Activo</span></div>
+          <div class="config-desc">
+            Gestionar usuarios con roles Admin, Mesa, Caja y Auditor.
+            Configurar permisos, contraseñas y PINs.
+          </div>
+        </div>
+
+        <div class="config-item" style="opacity:0.6;cursor:not-allowed">
+          <div class="config-icon">🖨️</div>
+          <div class="config-title">Impresoras <span class="badge soon">Próximamente</span></div>
+          <div class="config-desc">
+            Configurar impresoras térmicas de tickets.
+            Ajustar tamaños de papel y perfiles de impresión.
+          </div>
+        </div>
+
+        <div class="config-item" style="opacity:0.6;cursor:not-allowed">
+          <div class="config-icon">💾</div>
+          <div class="config-title">Base de Datos <span class="badge soon">Próximamente</span></div>
+          <div class="config-desc">
+            Configurar conexión a Supabase.
+            Backup y restauración de datos.
+          </div>
+        </div>
+
+        <div class="config-item" style="opacity:0.6;cursor:not-allowed">
+          <div class="config-icon">💰</div>
+          <div class="config-title">Monedas y Valores <span class="badge soon">Próximamente</span></div>
+          <div class="config-desc">
+            Configurar monedas aceptadas (DOP, USD).
+            Valores por defecto para emisión de tickets.
+          </div>
+        </div>
+
+        <div class="config-item" style="opacity:0.6;cursor:not-allowed">
+          <div class="config-icon">📊</div>
+          <div class="config-title">Logs del Sistema <span class="badge soon">Próximamente</span></div>
+          <div class="config-desc">
+            Ver historial de acciones del sistema.
+            Auditoría de cambios y errores.
+          </div>
+        </div>
+
+        <div class="config-item" style="opacity:0.6;cursor:not-allowed">
+          <div class="config-icon">🔐</div>
+          <div class="config-title">Seguridad <span class="badge soon">Próximamente</span></div>
+          <div class="config-desc">
+            Configurar políticas de seguridad.
+            Gestión de sesiones y autenticación.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Información del Sistema -->
+    <section class="card">
+      <h2>ℹ️ Información del Sistema</h2>
+      <div style="background:#111827;border:1px solid #334155;border-radius:8px;padding:16px">
+        <div style="display:grid;grid-template-columns:200px 1fr;gap:12px">
+          <div style="color:#9ca3af">Versión:</div>
+          <div style="font-weight:600">1.0.0</div>
+
+          <div style="color:#9ca3af">Sistema:</div>
+          <div style="font-weight:600">TITO Casino Voucher System</div>
+
+          <div style="color:#9ca3af">Base de datos:</div>
+          <div style="font-weight:600">Supabase + SQLite</div>
+
+          <div style="color:#9ca3af">Estado Supabase:</div>
+          <div id="supabase-status" style="font-weight:600;color:#10b981">🟢 Conectado</div>
+
+          <div style="color:#9ca3af">Health Monitor:</div>
+          <div id="health-status" style="font-weight:600;color:#10b981">🟢 Activo</div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <small>Sistema TITO · Configuración · Solo Administrador</small>
+  </footer>
+
+  <script>
+    // ============================================
+    // NAVEGACIÓN
+    // ============================================
+    document.getElementById('btnVolver').addEventListener('click', async () => {
+      console.log('🔙 Volviendo al panel...');
+      try {
+        await window.api?.invoke?.('open-view', 'panel');
+      } catch (error) {
+        console.error('Error volviendo al panel:', error);
+        window.location.href = '../Caja/panel.html';
+      }
+    });
+
+    // ============================================
+    // ABRIR MÓDULO DE OPERADORES
+    // ============================================
+    async function abrirOperadores() {
+      console.log('👤 Abriendo gestión de operadores...');
+      try {
+        const result = await window.api?.invoke?.('open-view', 'operadores');
+        if (!result?.success) {
+          console.error('❌ Error abriendo operadores:', result?.error);
+          alert('Error al abrir gestión de operadores');
+        }
+      } catch (error) {
+        console.error('❌ Error:', error);
+        alert('Error al abrir gestión de operadores');
+      }
+    }
+
+    // ============================================
+    // ABRIR MÓDULO DE USUARIOS
+    // ============================================
+    async function abrirUsuarios() {
+      console.log('👨‍💼 Abriendo gestión de usuarios...');
+      try {
+        const result = await window.api?.invoke?.('open-view', 'usuarios');
+        if (!result?.success) {
+          console.error('❌ Error abriendo usuarios:', result?.error);
+          alert('Error al abrir gestión de usuarios');
+        }
+      } catch (error) {
+        console.error('❌ Error:', error);
+        alert('Error al abrir gestión de usuarios');
+      }
+    }
+
+    // ============================================
+    // VERIFICAR ESTADO DEL SISTEMA
+    // ============================================
+    async function verificarEstado() {
+      try {
+        // Verificar Supabase
+        const healthResult = await window.api?.invoke?.('health-check');
+        if (healthResult?.success && healthResult?.health) {
+          const supabaseEl = document.getElementById('supabase-status');
+          const healthEl = document.getElementById('health-status');
+
+          // Estado Supabase (estimado)
+          if (healthResult.health.status === 'healthy') {
+            supabaseEl.textContent = '🟢 Conectado';
+            supabaseEl.style.color = '#10b981';
+          } else {
+            supabaseEl.textContent = '🟡 Verificando...';
+            supabaseEl.style.color = '#f59e0b';
+          }
+
+          // Estado Health Monitor
+          if (healthResult.health.timedoutOperations > 0) {
+            healthEl.textContent = '🔴 Con problemas';
+            healthEl.style.color = '#ef4444';
+          } else if (healthResult.health.runningOperations > 3) {
+            healthEl.textContent = '🟡 Carga alta';
+            healthEl.style.color = '#f59e0b';
+          } else {
+            healthEl.textContent = '🟢 Activo';
+            healthEl.style.color = '#10b981';
+          }
+        }
+      } catch (error) {
+        console.warn('No se pudo verificar estado:', error);
+      }
+    }
+
+    // Verificar estado al cargar
+    document.addEventListener('DOMContentLoaded', () => {
+      console.log('⚙️ Módulo de Configuración cargado');
+      verificarEstado();
+      // Actualizar cada 10 segundos
+      setInterval(verificarEstado, 10000);
+    });
+
+    // Sistema de salud anti-cuelgues: cargar indicador visual
+    (async function cargarIndicadorSalud() {
+      try {
+        const response = await fetch('health-indicator.html');
+        const html = await response.text();
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = html;
+        while (tempDiv.firstChild) {
+          document.body.appendChild(tempDiv.firstChild);
+        }
+        console.log('✅ Indicador de salud cargado');
+      } catch (e) {
+        console.warn('❌ No se pudo cargar indicador de salud:', e.message);
+      }
+    })();
+  </script>
+</body>
+</html>

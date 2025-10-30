@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gestión de Operadores</title>
+  <link rel="stylesheet" href="./style.css" />
+  <style>
+    body{font-family:system-ui,Segoe UI,Arial;background:#0b1220;color:#e5e7eb}
+    .card{background:#0f172a;border:1px solid #1f2937;border-radius:12px;padding:16px;max-width:980px;margin:16px auto}
+    .button{padding:10px 14px;border-radius:8px;border:1px solid #334155;background:#1f2937;color:#e5e7eb;cursor:pointer;margin:4px}
+    .button:hover{background:#2d3748}
+    .button.primary{background:#3b82f6;border-color:#3b82f6}
+    .button.primary:hover{background:#2563eb}
+    .button.danger{background:#ef4444;border-color:#ef4444}
+    .button.danger:hover{background:#dc2626}
+    .button.success{background:#10b981;border-color:#10b981}
+    .button.success:hover{background:#059669}
+    .operador-item{background:#111827;border:1px solid #334155;border-radius:8px;padding:12px;margin:8px 0;display:flex;justify-content:space-between;align-items:center}
+    .operador-info{flex:1}
+    .operador-nombre{font-size:16px;font-weight:600;margin-bottom:4px}
+    .operador-mesas{font-size:13px;color:#9ca3af}
+    .operador-actions{display:flex;gap:8px}
+    .modal{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:1000;align-items:center;justify-content:center}
+    .modal.show{display:flex}
+    .modal-content{background:#0f172a;border:1px solid #334155;border-radius:12px;padding:24px;max-width:500px;width:90%}
+    .modal-title{font-size:20px;font-weight:600;margin-bottom:16px}
+    .input{width:100%;padding:10px;border-radius:8px;border:1px solid #334155;background:#111827;color:#e5e7eb;margin:8px 0;font-size:14px}
+    .status{margin-left:12px;font-size:14px}
+    .badge{display:inline-block;padding:4px 8px;border-radius:4px;font-size:12px;font-weight:600}
+    .badge.active{background:#10b98120;color:#10b981}
+    .badge.inactive{background:#ef444420;color:#ef4444}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Gestión de Operadores</h1>
+    <nav>
+      <button class="button" id="btnVolver">Volver al Panel</button>
+    </nav>
+  </header>
+
+  <main>
+    <section class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <h2>Operadores del Sistema</h2>
+        <button class="button primary" id="btnNuevo">➕ Agregar Operador</button>
+      </div>
+      <span id="status" class="status"></span>
+    </section>
+
+    <section class="card">
+      <h3>Operadores Activos</h3>
+      <div id="lista-activos">
+        <p style="color:#9ca3af">Cargando...</p>
+      </div>
+    </section>
+
+    <section class="card">
+      <h3>Operadores Inactivos</h3>
+      <div id="lista-inactivos">
+        <p style="color:#9ca3af">No hay operadores inactivos</p>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <small>Sistema TITO · Gestión de Operadores</small>
+  </footer>
+
+  <!-- Modal para Agregar/Editar Operador -->
+  <div id="modal-operador" class="modal">
+    <div class="modal-content">
+      <h3 class="modal-title" id="modal-title">Nuevo Operador</h3>
+
+      <label>Nombre Completo</label>
+      <input type="text" id="nombre-operador" class="input" placeholder="Ej: Juan Pérez" />
+
+      <label>Mesas Asignadas (opcional)</label>
+      <input type="text" id="mesas-operador" class="input" placeholder="Ej: P01, P02, P03" />
+      <small style="color:#9ca3af">Separar con comas. Dejar vacío para todas las mesas.</small>
+
+      <div style="margin-top:20px;display:flex;gap:8px;justify-content:flex-end">
+        <button class="button" id="btnCancelar">Cancelar</button>
+        <button class="button primary" id="btnGuardar">Guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const statusEl = document.getElementById('status');
+    function msg(text, ok=true){
+      statusEl.textContent = text;
+      statusEl.style.color = ok? '#10b981' : '#ef4444';
+      setTimeout(() => statusEl.textContent = '', 5000);
+    }
+
+    let operadorEditando = null; // Para modo edición
+
+    // ============================================
+    // CARGAR OPERADORES
+    // ============================================
+    async function cargarOperadores() {
+      try {
+        console.log('📋 Cargando todos los operadores...');
+        const result = await window.api?.invoke?.('get-all-operadores');
+
+        if (!result) {
+          msg('❌ API no disponible', false);
+          return;
+        }
+
+        if (result.success && result.operadores) {
+          mostrarOperadores(result.operadores);
+          msg(`✅ ${result.operadores.length} operadores cargados`, true);
+        } else {
+          msg('❌ Error: ' + (result.error || 'Desconocido'), false);
+        }
+      } catch (error) {
+        console.error('❌ Error cargando operadores:', error);
+        msg('❌ Error cargando operadores', false);
+      }
+    }
+
+    // ============================================
+    // MOSTRAR OPERADORES EN LISTAS
+    // ============================================
+    function mostrarOperadores(operadores) {
+      const activos = operadores.filter(op => op.activo);
+      const inactivos = operadores.filter(op => !op.activo);
+
+      // Renderizar activos
+      const listaActivos = document.getElementById('lista-activos');
+      if (activos.length === 0) {
+        listaActivos.innerHTML = '<p style="color:#9ca3af">No hay operadores activos</p>';
+      } else {
+        listaActivos.innerHTML = activos.map(op => renderOperadorItem(op, true)).join('');
+      }
+
+      // Renderizar inactivos
+      const listaInactivos = document.getElementById('lista-inactivos');
+      if (inactivos.length === 0) {
+        listaInactivos.innerHTML = '<p style="color:#9ca3af">No hay operadores inactivos</p>';
+      } else {
+        listaInactivos.innerHTML = inactivos.map(op => renderOperadorItem(op, false)).join('');
+      }
+
+      // Agregar event listeners
+      document.querySelectorAll('[data-action]').forEach(btn => {
+        btn.addEventListener('click', handleAction);
+      });
+    }
+
+    // ============================================
+    // RENDERIZAR UN ITEM DE OPERADOR
+    // ============================================
+    function renderOperadorItem(op, isActive) {
+      const mesasText = op.mesas_asignadas && op.mesas_asignadas.length > 0
+        ? `Mesas: ${op.mesas_asignadas.join(', ')}`
+        : 'Todas las mesas';
+
+      return `
+        <div class="operador-item">
+          <div class="operador-info">
+            <div class="operador-nombre">
+              👤 ${op.nombre}
+              <span class="badge ${isActive ? 'active' : 'inactive'}">
+                ${isActive ? 'Activo' : 'Inactivo'}
+              </span>
+            </div>
+            <div class="operador-mesas">${mesasText}</div>
+          </div>
+          <div class="operador-actions">
+            ${isActive ? `
+              <button class="button" data-action="edit" data-id="${op.id}">✏️ Editar</button>
+              <button class="button danger" data-action="deactivate" data-id="${op.id}">🗑️ Desactivar</button>
+            ` : `
+              <button class="button success" data-action="activate" data-id="${op.id}">✅ Reactivar</button>
+            `}
+          </div>
+        </div>
+      `;
+    }
+
+    // ============================================
+    // MANEJAR ACCIONES (Editar, Activar, Desactivar)
+    // ============================================
+    async function handleAction(event) {
+      const action = event.currentTarget.dataset.action;
+      const operadorId = parseInt(event.currentTarget.dataset.id);
+
+      if (action === 'edit') {
+        editarOperador(operadorId);
+      } else if (action === 'activate') {
+        await toggleOperador(operadorId, true);
+      } else if (action === 'deactivate') {
+        if (confirm('¿Desactivar este operador? No aparecerá en la lista de Mesa.')) {
+          await toggleOperador(operadorId, false);
+        }
+      }
+    }
+
+    // ============================================
+    // TOGGLE OPERADOR (Activar/Desactivar)
+    // ============================================
+    async function toggleOperador(operadorId, activo) {
+      try {
+        const result = await window.api?.invoke?.('toggle-operador', operadorId, activo);
+
+        if (result.success) {
+          msg(`✅ Operador ${activo ? 'activado' : 'desactivado'} exitosamente`, true);
+          cargarOperadores(); // Recargar lista
+        } else {
+          msg('❌ Error: ' + (result.error || 'Desconocido'), false);
+        }
+      } catch (error) {
+        console.error('❌ Error toggle operador:', error);
+        msg('❌ Error al cambiar estado', false);
+      }
+    }
+
+    // ============================================
+    // MODAL: NUEVO OPERADOR
+    // ============================================
+    document.getElementById('btnNuevo').addEventListener('click', () => {
+      operadorEditando = null;
+      document.getElementById('modal-title').textContent = 'Nuevo Operador';
+      document.getElementById('nombre-operador').value = '';
+      document.getElementById('mesas-operador').value = '';
+      document.getElementById('modal-operador').classList.add('show');
+    });
+
+    // ============================================
+    // MODAL: EDITAR OPERADOR
+    // ============================================
+    function editarOperador(operadorId) {
+      // TODO: Cargar datos del operador y mostrar en modal
+      alert('Función de editar en desarrollo. Por ahora puedes desactivar y crear uno nuevo.');
+    }
+
+    // ============================================
+    // MODAL: CANCELAR
+    // ============================================
+    document.getElementById('btnCancelar').addEventListener('click', () => {
+      document.getElementById('modal-operador').classList.remove('show');
+    });
+
+    // ============================================
+    // MODAL: GUARDAR OPERADOR
+    // ============================================
+    document.getElementById('btnGuardar').addEventListener('click', async () => {
+      const nombre = document.getElementById('nombre-operador').value.trim();
+      const mesasText = document.getElementById('mesas-operador').value.trim();
+
+      // Validación
+      if (!nombre) {
+        alert('❌ El nombre del operador es requerido');
+        return;
+      }
+
+      // Procesar mesas asignadas
+      const mesas = mesasText
+        ? mesasText.split(',').map(m => m.trim()).filter(m => m)
+        : [];
+
+      try {
+        const result = await window.api?.invoke?.('create-operador', {
+          nombre: nombre,
+          mesas: mesas
+        });
+
+        if (result.success) {
+          msg(`✅ Operador "${nombre}" creado exitosamente`, true);
+          document.getElementById('modal-operador').classList.remove('show');
+          cargarOperadores(); // Recargar lista
+        } else {
+          alert('❌ Error: ' + (result.error || 'Desconocido'));
+        }
+      } catch (error) {
+        console.error('❌ Error creando operador:', error);
+        alert('❌ Error al crear operador');
+      }
+    });
+
+    // ============================================
+    // VOLVER AL PANEL
+    // ============================================
+    document.getElementById('btnVolver').addEventListener('click', async () => {
+      try {
+        await window.api?.closeCurrent?.();
+      } catch (_) {
+        try { window.close(); } catch {}
+      }
+    });
+
+    // ============================================
+    // INICIALIZACIÓN
+    // ============================================
+    cargarOperadores();
+  </script>
+</body>
+</html>

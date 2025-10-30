@@ -19,16 +19,20 @@
     "build:mac": "npm run react-build && electron-builder --mac",
     "build:linux": "npm run react-build && electron-builder --linux",
     "postinstall": "electron-builder install-app-deps",
-    "test": "jest",
-    "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage"
+    "test": "jest tests/validation.test.js tests/handlers.test.js tests/supabase.test.js",
+    "test:all": "jest",
+    "test:watch": "jest tests/validation.test.js tests/handlers.test.js tests/supabase.test.js --watch",
+    "test:coverage": "jest tests/validation.test.js tests/handlers.test.js tests/supabase.test.js --coverage"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.76.1",
+    "bcryptjs": "^3.0.2",
     "better-sqlite3": "^8.7.0",
     "bwip-js": "^3.0.2",
     "crypto-js": "^4.2.0",
     "dotenv": "^17.2.3",
+    "jspdf": "^3.0.3",
+    "jspdf-autotable": "^5.0.2",
     "node-hid": "^2.1.2",
     "node-thermal-printer": "^4.4.0",
     "pdf-lib": "^1.17.1",
@@ -81,20 +85,6 @@
     "linux": {
       "target": "AppImage"
     }
-  },
-  "jest": {
-    "testEnvironment": "node",
-    "setupFilesAfterEnv": [
-      "@testing-library/jest-dom"
-    ],
-    "testMatch": [
-      "**/tests/**/*.test.js"
-    ],
-    "coverageDirectory": "coverage",
-    "collectCoverageFrom": [
-      "src/**/*.js",
-      "!src/main/main.js"
-    ]
   },
   "keywords": [],
   "author": "",

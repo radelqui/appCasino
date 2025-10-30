@@ -314,7 +314,7 @@ class CasinoDatabase {
   redeemTicket(code, cajeroId = 'CAJA-01') {
     const v = this.validateTicket(code);
     if (!v.valid) return { success: false, reason: v.reason, message: 'Ticket no válido para cobro' };
-    this.db.prepare('UPDATE tickets SET estado = \"usado\", fecha_cobro = CURRENT_TIMESTAMP, cajero_id = ? WHERE code = ?').run(cajeroId, String(code).toUpperCase());
+    this.db.prepare("UPDATE tickets SET estado = 'usado', fecha_cobro = CURRENT_TIMESTAMP, cajero_id = ? WHERE code = ?").run(cajeroId, String(code).toUpperCase());
     try { this.addAuditLog('ticket_cobrado', String(code).toUpperCase(), cajeroId, `Ticket cobrado: ${v.ticket.currency} ${v.ticket.amount}`); } catch {}
     return { success: true, ticket: v.ticket };
   }

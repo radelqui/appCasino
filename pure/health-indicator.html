@@ -1,0 +1,273 @@
+<!-- health-indicator.html - Componente visual de indicador de salud -->
+<!-- Incluir esto en las páginas de Mesa y Caja -->
+
+<style>
+  .health-indicator {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: rgba(18, 24, 43, 0.95);
+    border: 1px solid rgba(46, 125, 233, 0.3);
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+    font-family: system-ui, -apple-system, sans-serif;
+    font-size: 12px;
+    color: #e8eefc;
+    cursor: pointer;
+    transition: all 0.3s ease;
+  }
+
+  .health-indicator:hover {
+    background: rgba(18, 24, 43, 1);
+    border-color: rgba(46, 125, 233, 0.6);
+  }
+
+  .health-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  .health-dot.healthy {
+    background: #7bc379;
+    box-shadow: 0 0 8px rgba(123, 195, 121, 0.6);
+  }
+
+  .health-dot.warning {
+    background: #e3b341;
+    box-shadow: 0 0 8px rgba(227, 179, 65, 0.6);
+  }
+
+  .health-dot.unhealthy {
+    background: #e35d5d;
+    box-shadow: 0 0 8px rgba(227, 93, 93, 0.6);
+    animation: pulse-fast 0.5s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+  }
+
+  @keyframes pulse-fast {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.7; transform: scale(1.1); }
+  }
+
+  .health-details {
+    position: fixed;
+    bottom: 70px;
+    right: 20px;
+    z-index: 9999;
+    background: rgba(18, 24, 43, 0.98);
+    border: 1px solid rgba(46, 125, 233, 0.3);
+    border-radius: 8px;
+    padding: 16px;
+    min-width: 300px;
+    max-width: 400px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+    display: none;
+    font-size: 12px;
+    color: #e8eefc;
+  }
+
+  .health-details.visible {
+    display: block;
+  }
+
+  .health-details h3 {
+    margin: 0 0 12px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #2e7de9;
+  }
+
+  .health-stat {
+    display: flex;
+    justify-content: space-between;
+    padding: 6px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  .health-stat:last-child {
+    border-bottom: none;
+  }
+
+  .health-stat-label {
+    color: #a9b3c7;
+  }
+
+  .health-stat-value {
+    font-weight: 600;
+  }
+
+  .health-stat-value.good {
+    color: #7bc379;
+  }
+
+  .health-stat-value.warn {
+    color: #e3b341;
+  }
+
+  .health-stat-value.bad {
+    color: #e35d5d;
+  }
+</style>
+
+<div class="health-indicator" id="healthIndicator">
+  <div class="health-dot healthy" id="healthDot"></div>
+  <span id="healthStatus">En línea</span>
+</div>
+
+<div class="health-details" id="healthDetails">
+  <h3>Estado del Sistema</h3>
+  <div class="health-stat">
+    <span class="health-stat-label">Estado:</span>
+    <span class="health-stat-value good" id="detailStatus">En línea</span>
+  </div>
+  <div class="health-stat">
+    <span class="health-stat-label">Tiempo activo:</span>
+    <span class="health-stat-value" id="detailUptime">-</span>
+  </div>
+  <div class="health-stat">
+    <span class="health-stat-label">Operaciones activas:</span>
+    <span class="health-stat-value" id="detailRunning">0</span>
+  </div>
+  <div class="health-stat">
+    <span class="health-stat-label">Timeouts:</span>
+    <span class="health-stat-value" id="detailTimeouts">0</span>
+  </div>
+  <div class="health-stat">
+    <span class="health-stat-label">BD (promedio):</span>
+    <span class="health-stat-value" id="detailDbAvg">-</span>
+  </div>
+  <div class="health-stat">
+    <span class="health-stat-label">Supabase (promedio):</span>
+    <span class="health-stat-value" id="detailSupabaseAvg">-</span>
+  </div>
+  <div class="health-stat">
+    <span class="health-stat-label">Último heartbeat:</span>
+    <span class="health-stat-value" id="detailHeartbeat">-</span>
+  </div>
+</div>
+
+<script>
+(function() {
+  const indicator = document.getElementById('healthIndicator');
+  const dot = document.getElementById('healthDot');
+  const status = document.getElementById('healthStatus');
+  const details = document.getElementById('healthDetails');
+
+  let detailsVisible = false;
+
+  // Toggle detalles al hacer click
+  indicator.addEventListener('click', () => {
+    detailsVisible = !detailsVisible;
+    details.classList.toggle('visible', detailsVisible);
+    if (detailsVisible) {
+      updateHealthDetails();
+    }
+  });
+
+  // Cerrar detalles al hacer click fuera
+  document.addEventListener('click', (e) => {
+    if (!indicator.contains(e.target) && !details.contains(e.target)) {
+      detailsVisible = false;
+      details.classList.remove('visible');
+    }
+  });
+
+  // Actualizar estado cada 5 segundos
+  setInterval(updateHealthStatus, 5000);
+  updateHealthStatus();
+
+  async function updateHealthStatus() {
+    try {
+      if (!window.api || !window.api.invoke) {
+        console.warn('[Health] API no disponible');
+        return;
+      }
+
+      const result = await window.api.invoke('health-check');
+
+      if (!result || !result.success) {
+        setStatus('unhealthy', 'Error');
+        return;
+      }
+
+      const health = result.health;
+
+      // Determinar estado
+      let statusLevel = 'healthy';
+      let statusText = 'En línea';
+
+      if (health.timedoutOperations > 0) {
+        statusLevel = 'unhealthy';
+        statusText = `Fuera de línea (${health.timedoutOperations} timeouts)`;
+      } else if (health.runningOperations > 3) {
+        statusLevel = 'warning';
+        statusText = `En línea (${health.runningOperations} ops)`;
+      } else if (health.timeSinceHeartbeat > 15000) {
+        statusLevel = 'warning';
+        statusText = 'En línea (sin heartbeat)';
+      }
+
+      setStatus(statusLevel, statusText);
+
+      // Actualizar detalles si están visibles
+      if (detailsVisible) {
+        updateHealthDetails(health);
+      }
+
+    } catch (error) {
+      console.error('[Health] Error actualizando estado:', error);
+      setStatus('unhealthy', 'Error');
+    }
+  }
+
+  function setStatus(level, text) {
+    dot.className = `health-dot ${level}`;
+    status.textContent = text;
+  }
+
+  async function updateHealthDetails(health = null) {
+    try {
+      if (!health) {
+        const result = await window.api.invoke('health-check');
+        if (!result || !result.success) return;
+        health = result.health;
+      }
+
+      document.getElementById('detailStatus').textContent = health.status === 'healthy' ? 'En línea' : 'Fuera de línea';
+      document.getElementById('detailStatus').className = `health-stat-value ${health.status === 'healthy' ? 'good' : 'bad'}`;
+
+      document.getElementById('detailUptime').textContent = health.uptimeHuman || '-';
+
+      document.getElementById('detailRunning').textContent = health.runningOperations;
+      document.getElementById('detailRunning').className = `health-stat-value ${health.runningOperations > 3 ? 'warn' : 'good'}`;
+
+      document.getElementById('detailTimeouts').textContent = health.timedoutOperations;
+      document.getElementById('detailTimeouts').className = `health-stat-value ${health.timedoutOperations > 0 ? 'bad' : 'good'}`;
+
+      document.getElementById('detailDbAvg').textContent = health.averages.db > 0 ? `${health.averages.db}ms` : '-';
+      document.getElementById('detailDbAvg').className = `health-stat-value ${health.averages.db > 1000 ? 'warn' : 'good'}`;
+
+      document.getElementById('detailSupabaseAvg').textContent = health.averages.supabase > 0 ? `${health.averages.supabase}ms` : '-';
+      document.getElementById('detailSupabaseAvg').className = `health-stat-value ${health.averages.supabase > 3000 ? 'warn' : 'good'}`;
+
+      const heartbeatSeconds = Math.floor(health.timeSinceHeartbeat / 1000);
+      document.getElementById('detailHeartbeat').textContent = `${heartbeatSeconds}s ago`;
+      document.getElementById('detailHeartbeat').className = `health-stat-value ${heartbeatSeconds > 15 ? 'warn' : 'good'}`;
+
+    } catch (error) {
+      console.error('[Health] Error actualizando detalles:', error);
+    }
+  }
+})();
+</script>

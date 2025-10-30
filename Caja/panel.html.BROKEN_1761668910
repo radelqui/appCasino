@@ -1,0 +1,1371 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema Casino - Panel Principal</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 1200px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .logo {
+            width: 120px;
+            height: 120px;
+            margin: 0 auto 20px;
+            background: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            font-size: 48px;
+        }
+
+        h1 {
+            color: white;
+            font-size: 36px;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .subtitle {
+            color: rgba(255,255,255,0.9);
+            font-size: 18px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            margin-top: 40px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            transition: transform 0.3s, box-shadow 0.3s;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 40px rgba(0,0,0,0.3);
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 5px;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .card-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+            height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .card-title {
+            font-size: 24px;
+            color: #333;
+            margin-bottom: 15px;
+            font-weight: bold;
+        }
+
+        .card-description {
+            color: #666;
+            line-height: 1.6;
+            margin-bottom: 20px;
+        }
+
+        .card-button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 25px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: opacity 0.3s;
+        }
+
+        .card-button:hover {
+            opacity: 0.9;
+        }
+
+        .mesa-card { --card-color: #28a745; }
+        .caja-card { --card-color: #dc3545; }
+        .auditoria-card { --card-color: #ffc107; }
+        .config-card { --card-color: #17a2b8; }
+
+        /* Estado deshabilitado por rol */
+        .card.disabled {
+            opacity: 0.6;
+            filter: grayscale(0.1);
+        }
+        .card.disabled .card-button {
+            background: #bdbdbd;
+            cursor: not-allowed;
+        }
+        .card.disabled::after {
+            content: 'Acceso restringido por rol';
+            position: absolute;
+            bottom: 12px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.85);
+            color: #fff;
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s;
+            white-space: nowrap;
+            z-index: 10;
+        }
+        .card.disabled:hover::after {
+            opacity: 1;
+        }
+
+        .status-bar {
+            background: rgba(255,255,255,0.1);
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 40px;
+            display: flex;
+            justify-content: space-around;
+            backdrop-filter: blur(10px);
+        }
+
+        .status-item {
+            text-align: center;
+            color: white;
+        }
+
+        .status-value {
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        .status-label {
+            font-size: 12px;
+            opacity: 0.8;
+            margin-top: 5px;
+        }
+
+        .connection-indicator {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #28a745;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 14px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+
+        .connection-indicator.offline {
+            background: #dc3545;
+        }
+
+        .pulse {
+            width: 10px;
+            height: 10px;
+            background: white;
+            border-radius: 50%;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(0.8); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+
+        .shortcuts {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(0,0,0,0.5);
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            font-size: 12px;
+            backdrop-filter: blur(10px);
+        }
+
+        .shortcut-item {
+            margin: 5px 0;
+        }
+
+        .shortcut-key {
+            background: rgba(255,255,255,0.2);
+            padding: 2px 8px;
+            border-radius: 3px;
+            margin-right: 10px;
+        }
+
+        /* Estilos para las vistas */
+        .view-header {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .back-btn {
+            background: #6c757d;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.3s;
+        }
+
+        .back-btn:hover {
+            background: #5a6268;
+        }
+
+        .view-header h2 {
+            margin: 0;
+            color: #333;
+            font-size: 24px;
+        }
+
+        .view-content {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        /* Estilos específicos para Auditoría */
+        .auditoria-controls {
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .filters-section h3,
+        .totales-section h3,
+        .export-section h3 {
+            margin: 0 0 15px 0;
+            color: #333;
+            font-size: 18px;
+            border-bottom: 2px solid #e9ecef;
+            padding-bottom: 10px;
+        }
+
+        .filter-row {
+            display: flex;
+            gap: 15px;
+            align-items: end;
+            flex-wrap: wrap;
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .filter-group label {
+            font-weight: 600;
+            color: #555;
+            font-size: 14px;
+        }
+
+        .filter-group input,
+        .filter-group select {
+            padding: 8px 12px;
+            border: 2px solid #e9ecef;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        .filter-group input:focus,
+        .filter-group select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: background 0.3s;
+        }
+
+        .btn-primary:hover {
+            background: #5a67d8;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: background 0.3s;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+
+        .totales-section {
+            margin: 25px 0;
+        }
+
+        .totales-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+        }
+
+        .total-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+
+        .total-label {
+            font-size: 12px;
+            opacity: 0.9;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .total-value {
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        .export-section {
+            margin-top: 25px;
+        }
+
+        .export-buttons {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .btn-export {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: background 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-export:hover {
+            background: #218838;
+        }
+
+        .vouchers-table-container {
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+
+        .vouchers-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .vouchers-table th {
+            background: #f8f9fa;
+            padding: 15px 12px;
+            text-align: left;
+            font-weight: 600;
+            color: #333;
+            border-bottom: 2px solid #e9ecef;
+            font-size: 14px;
+        }
+
+        .vouchers-table td {
+            padding: 12px;
+            border-bottom: 1px solid #e9ecef;
+            font-size: 14px;
+        }
+
+        .vouchers-table tr:hover {
+            background: #f8f9fa;
+        }
+
+        .vouchers-table .loading {
+            text-align: center;
+            padding: 40px;
+            color: #6c757d;
+            font-style: italic;
+        }
+
+        .estado-badge {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .estado-activo {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .estado-usado {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+
+        .estado-cancelado {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .estado-expirado {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .btn-pagination {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.3s;
+        }
+
+        .btn-pagination:hover:not(:disabled) {
+            background: #5a67d8;
+        }
+
+        .btn-pagination:disabled {
+            background: #e9ecef;
+            color: #6c757d;
+            cursor: not-allowed;
+        }
+
+        #paginaInfo {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .action-btn {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: background 0.3s;
+        }
+
+        .action-btn:hover {
+            background: #c82333;
+        }
+    </style>
+</head>
+<body>
+    <div class="connection-indicator" id="connectionStatus">
+        <div class="pulse"></div>
+        <span>Sistema Online</span>
+    </div>
+
+    <div class="container">
+        <!-- Panel Principal -->
+        <div id="mainPanel">
+            <div class="header">
+                <div class="logo">
+                <img src="file:///C:/appCasino/Diseño Ticket/logo casino.webp" alt="Logo Casino" style="width:100%; height:100%; object-fit:cover; border-radius:50%;" onerror="this.src=this.dataset.fallback" data-fallback="https://via.placeholder.com/120?text=CASINO" />
+                </div>
+                <h1>CORAL REEF CASINO</h1>
+                <div class="subtitle">Sistema de Gestión de Vouchers</div>
+            </div>
+
+            <div class="grid">
+            <!-- Mesa -->
+            <div class="card mesa-card" onclick="openView('mesa')">
+                <div class="card-icon">🎰</div>
+                <div class="card-title">MESA</div>
+                <div class="card-description">
+                    Generación de vouchers, emisión de tickets, 
+                    impresión térmica para operadores de mesa.
+                </div>
+                <button class="card-button">Abrir Mesa</button>
+            </div>
+
+            <!-- Caja -->
+            <div class="card caja-card" onclick="openView('caja')">
+                <div class="card-icon">💵</div>
+                <div class="card-title">CAJA</div>
+                <div class="card-description">
+                    Validación y cobro de vouchers, escaneo de QR, 
+                    procesamiento de pagos.
+                </div>
+                <button class="card-button">Abrir Caja</button>
+            </div>
+
+            <!-- Auditoría -->
+            <div class="card auditoria-card" onclick="openView('auditoria')">
+                <div class="card-icon">📊</div>
+                <div class="card-title">AUDITORÍA</div>
+                <div class="card-description">
+                    Reportes, estadísticas, historial de transacciones,
+                    exportación de datos.
+                </div>
+                <button class="card-button">Abrir Auditoría</button>
+            </div>
+
+            <!-- Configuración -->
+            <div class="card config-card" onclick="openView('config')">
+                <div class="card-icon">⚙️</div>
+                <div class="card-title">CONFIGURACIÓN</div>
+                <div class="card-description">
+                    Ajustes del sistema, impresoras, base de datos,
+                    sincronización y respaldos.
+                </div>
+                <button class="card-button">Configurar</button>
+            </div>
+
+            <div class="status-bar">
+            <div class="status-item">
+                <div class="status-value" id="ticketsHoy">0</div>
+                <div class="status-label">Tickets Hoy</div>
+            </div>
+            <div class="status-item">
+                <div class="status-value" id="totalDOP">RD$ 0</div>
+                <div class="status-label">Total DOP</div>
+            </div>
+            <div class="status-item">
+                <div class="status-value" id="totalUSD">$0</div>
+                <div class="status-label">Total USD</div>
+            </div>
+            <div class="status-item">
+                <div class="status-value" id="horaActual">--:--</div>
+                <div class="status-label">Hora Sistema</div>
+            </div>
+            <div class="status-item">
+              <button id="logoutBtn" onclick="logoutAndPrompt()" style="padding:8px 12px; background:#ef4444; color:#fff; border:none; border-radius:8px; box-shadow:0 4px 10px rgba(239,68,68,.3);">Cerrar sesión</button>
+            </div>
+        </div>
+        </div>
+
+        <!-- Vista Mesa -->
+        <div id="mesaView" style="display: none;">
+            <div class="view-header">
+                <button onclick="showMainPanel()" class="back-btn">← Volver al Panel</button>
+                <h2>Mesa - Generación de Vouchers</h2>
+            </div>
+            <div class="view-content">
+                <p>Vista de Mesa no implementada. Use la aplicación Mesa dedicada.</p>
+            </div>
+        </div>
+
+        <!-- Vista Caja -->
+        <div id="cajaView" style="display: none;">
+            <div class="view-header">
+                <button onclick="showMainPanel()" class="back-btn">← Volver al Panel</button>
+                <h2>Caja - Validación y Cobro</h2>
+            </div>
+            <div class="view-content">
+                <p>Vista de Caja no implementada. Use la aplicación Caja dedicada.</p>
+            </div>
+        </div>
+
+        <!-- Vista Auditoría -->
+        <div id="auditoriaView" style="display: none;">
+            <div class="view-header">
+                <button onclick="showMainPanel()" class="back-btn">← Volver al Panel</button>
+                <h2>Auditoría - Reportes y Estadísticas</h2>
+            </div>
+            
+            <div class="auditoria-controls">
+                <div class="filters-section">
+                    <h3>Filtros</h3>
+                    <div class="filter-row">
+                        <div class="filter-group">
+                            <label>Fecha Desde:</label>
+                            <input type="date" id="fechaDesde" />
+                        </div>
+                        <div class="filter-group">
+                            <label>Fecha Hasta:</label>
+                            <input type="date" id="fechaHasta" />
+                        </div>
+                        <div class="filter-group">
+                            <label>Estado:</label>
+                            <select id="filtroEstado">
+                                <option value="">Todos</option>
+                                <option value="activo">Activo</option>
+                                <option value="usado">Usado</option>
+                                <option value="cancelado">Cancelado</option>
+                                <option value="expirado">Expirado</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label>Moneda:</label>
+                            <select id="filtroMoneda">
+                                <option value="">Todas</option>
+                                <option value="DOP">DOP</option>
+                                <option value="USD">USD</option>
+                            </select>
+                        </div>
+                        <button onclick="aplicarFiltros()" class="btn-primary">Aplicar Filtros</button>
+                        <button onclick="limpiarFiltros()" class="btn-secondary">Limpiar</button>
+                    </div>
+                </div>
+
+                <div class="totales-section">
+                    <h3>Resumen</h3>
+                    <div class="totales-grid">
+                        <div class="total-card">
+                            <div class="total-label">Total Vouchers</div>
+                            <div class="total-value" id="totalVouchers">0</div>
+                        </div>
+                        <div class="total-card">
+                            <div class="total-label">Total DOP</div>
+                            <div class="total-value" id="totalDOPAuditoria">RD$ 0</div>
+                        </div>
+                        <div class="total-card">
+                            <div class="total-label">Total USD</div>
+                            <div class="total-value" id="totalUSDAuditoria">$ 0</div>
+                        </div>
+                        <div class="total-card">
+                            <div class="total-label">Activos</div>
+                            <div class="total-value" id="totalActivos">0</div>
+                        </div>
+                        <div class="total-card">
+                            <div class="total-label">Usados</div>
+                            <div class="total-value" id="totalUsados">0</div>
+                        </div>
+                        <div class="total-card">
+                            <div class="total-label">Cancelados</div>
+                            <div class="total-value" id="totalCancelados">0</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="export-section">
+                    <h3>Exportar Datos</h3>
+                    <div class="export-buttons">
+                        <button onclick="exportarCSV()" class="btn-export">📊 Exportar CSV</button>
+                        <button onclick="exportarPDF()" class="btn-export">📄 Exportar PDF</button>
+                        <button onclick="exportarExcel()" class="btn-export">📈 Exportar Excel</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="vouchers-table-container">
+                <table class="vouchers-table">
+                    <thead>
+                        <tr>
+                            <th>Código</th>
+                            <th>Fecha Creación</th>
+                            <th>Monto</th>
+                            <th>Moneda</th>
+                            <th>Estado</th>
+                            <th>Fecha Uso</th>
+                            <th>Usuario</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="vouchersTableBody">
+                        <tr>
+                            <td colspan="8" class="loading">Cargando datos...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="pagination">
+                <button onclick="cambiarPagina(-1)" id="btnAnterior" class="btn-pagination">← Anterior</button>
+                <span id="paginaInfo">Página 1 de 1</span>
+                <button onclick="cambiarPagina(1)" id="btnSiguiente" class="btn-pagination">Siguiente →</button>
+            </div>
+        </div>
+
+        <!-- Vista Configuración -->
+        <div id="configView" style="display: none;">
+            <div class="view-header">
+                <button onclick="showMainPanel()" class="back-btn">← Volver al Panel</button>
+                <h2>Configuración del Sistema</h2>
+            </div>
+            <div class="view-content">
+                <p>Vista de Configuración no implementada.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bloque de atajos eliminado permanentemente -->
+
+    <!-- Modal Login Caja eliminado: acceso controlado por rol global -->
+
+    <script>
+        // Navegación interna - NO abre nuevas ventanas
+        async function openView(view) {
+            // Requiere sesión activa antes de navegar
+            try {
+                const session = await window.api?.getSession?.();
+                if (!session || !session.user) { showLoginApp(); return; }
+            } catch { showLoginApp(); return; }
+        
+            let role = 'MESA';
+            try {
+                const r = await (window.api?.getRole?.() ?? Promise.resolve('MESA'));
+                role = String(r).toUpperCase();
+            } catch (err) {
+                console.warn('Fallo getRole, usando MESA por defecto:', err?.message || err);
+                role = 'MESA';
+            }
+            // Reglas de acceso
+            if (view === 'caja' && !(role === 'CAJA' || role === 'ADMIN')) {
+                alert('Acceso restringido: solo Caja o Admin');
+                return;
+            }
+            if (view === 'auditoria' && !(role === 'AUDITOR' || role === 'ADMIN')) {
+                alert('Acceso restringido: solo Auditor o Admin');
+                return;
+            }
+            if (view === 'config' && !(role === 'ADMIN')) {
+                alert('Acceso restringido: solo Admin');
+                return;
+            }
+
+            // Ocultar panel principal y mostrar vista específica
+            document.getElementById('mainPanel').style.display = 'none';
+            
+            // Ocultar todas las vistas
+            const views = ['mesaView', 'cajaView', 'auditoriaView', 'configView'];
+            views.forEach(viewId => {
+                const element = document.getElementById(viewId);
+                if (element) element.style.display = 'none';
+            });
+
+            // Mostrar vista solicitada
+            const targetView = document.getElementById(view + 'View');
+            if (targetView) {
+                targetView.style.display = 'block';
+                
+                // Cargar datos específicos de la vista
+                if (view === 'auditoria') {
+                    loadAuditoriaData();
+                }
+            } else {
+                // Si no existe la vista, mostrar mensaje
+                alert('Vista no implementada: ' + view);
+                showMainPanel();
+            }
+        }
+
+        function showMainPanel() {
+            document.getElementById('mainPanel').style.display = 'block';
+            const views = ['mesaView', 'cajaView', 'auditoriaView', 'configView'];
+            views.forEach(viewId => {
+                const element = document.getElementById(viewId);
+                if (element) element.style.display = 'none';
+            });
+        }
+
+        // Atajos de teclado
+        document.addEventListener('keydown', (e) => {
+            if (e.altKey) {
+                switch(e.key.toLowerCase()) {
+                    case 'm':
+                        openView('mesa');
+                        break;
+                    case 'c':
+                        openView('caja');
+                        break;
+                    case 'a':
+                        openView('auditoria');
+                        break;
+                }
+            }
+        });
+
+        // Estado visual según rol (sin ocultar, sólo deshabilitar)
+        (async () => {
+            try {
+                const role = String(await (window.api?.getRole?.() || Promise.resolve('MESA'))).toUpperCase();
+                const cajaCard = document.querySelector('.caja-card');
+                const auditoriaCard = document.querySelector('.auditoria-card');
+                const configCard = document.querySelector('.config-card');
+                cajaCard?.classList.toggle('disabled', !(role === 'CAJA' || role === 'ADMIN'));
+                auditoriaCard?.classList.toggle('disabled', !(role === 'AUDITOR' || role === 'ADMIN'));
+                configCard?.classList.toggle('disabled', !(role === 'ADMIN'));
+            } catch (e) {
+                console.warn('No se pudo determinar rol:', e.message);
+            }
+        })();
+
+        // Actualizar hora
+        function updateTime() {
+            const now = new Date();
+            document.getElementById('horaActual').textContent = 
+                now.toLocaleTimeString('es-DO', { hour: '2-digit', minute: '2-digit' });
+        }
+        setInterval(updateTime, 1000);
+        updateTime();
+
+        // Cargar estadísticas
+        async function loadStats() {
+            try {
+                const stats = await window.api?.getStatsToday();
+                document.getElementById('ticketsHoy').textContent = stats?.ticketsHoy || 0;
+                document.getElementById('totalDOP').textContent = `RD$ ${(stats?.totalDOP || 0).toFixed(2)}`;
+                document.getElementById('totalUSD').textContent = `$${(stats?.totalUSD || 0).toFixed(2)}`;
+            } catch (error) {
+                console.error('Error cargando estadísticas:', error);
+                document.getElementById('ticketsHoy').textContent = 0;
+                document.getElementById('totalDOP').textContent = `RD$ 0.00`;
+                document.getElementById('totalUSD').textContent = `$0.00`;
+            }
+        }
+
+        // Estado de conexión
+        function updateConnectionStatus() {
+            const indicator = document.getElementById('connectionStatus');
+            if (navigator.onLine) {
+                indicator.classList.remove('offline');
+                indicator.innerHTML = '<div class="pulse"></div><span>Sistema Online</span>';
+            } else {
+                indicator.classList.add('offline');
+                indicator.innerHTML = '<div class="pulse"></div><span>Sistema Offline</span>';
+            }
+        }
+
+        window.addEventListener('online', updateConnectionStatus);
+        window.addEventListener('offline', updateConnectionStatus);
+        
+        // Inicializar
+        loadStats();
+        updateConnectionStatus();
+
+        // Login Caja removido: se usa login global y control de acceso por rol
+    </script>
+
+    <!-- Modal Login General -->
+    <div id="loginAppModal" class="modal" style="display:none; position:fixed; inset:0; background:linear-gradient(135deg, rgba(30,60,114,.65), rgba(42,82,152,.65)); backdrop-filter: blur(3px); align-items:center; justify-content:center;">
+      <div class="modal-content" style="background:#ffffff; padding:24px; border-radius:16px; width:400px; box-shadow:0 20px 50px rgba(0,0,0,.35); border:1px solid rgba(255,255,255,.15); position:relative; overflow:hidden;">
+        <div style="position:absolute; inset:0; pointer-events:none; opacity:.08; background: radial-gradient(circle at 20% 0%, #667eea, transparent 40%), radial-gradient(circle at 80% 100%, #764ba2, transparent 45%);"></div>
+        <div style="position:relative;">
+          <h3 style="margin:0 0 8px 0; font-size:22px; color:#2c3e50;">Bienvenido</h3>
+          <p style="margin:0 0 16px 0; color:#6b7280; font-size:13px;">Inicia sesión para acceder al sistema</p>
+          <div class="field" style="margin-bottom:12px;">
+            <label style="display:block; font-size:12px; color:#6b7280; margin-bottom:6px;">Usuario</label>
+            <input id="appUsername" placeholder="usuario@dominio" style="width:100%; padding:10px 12px; border:1px solid #e5e7eb; border-radius:10px; outline:none; transition:border .2s;" onfocus="this.style.border='1px solid #667eea'" onblur="this.style.border='1px solid #e5e7eb'" />
+          </div>
+          <div class="field">
+            <label style="display:block; font-size:12px; color:#6b7280; margin-bottom:6px;">Contraseña</label>
+            <input id="appPassword" type="password" placeholder="••••••••" style="width:100%; padding:10px 12px; border:1px solid #e5e7eb; border-radius:10px; outline:none; transition:border .2s;" onfocus="this.style.border='1px solid #667eea'" onblur="this.style.border='1px solid #e5e7eb'" />
+          </div>
+          <div style="display:flex; gap:10px; margin-top:16px;">
+            <button id="btnLoginApp" onclick="attemptLoginApp()" style="flex:1; padding:10px 14px; background:linear-gradient(135deg,#667eea,#764ba2); color:#fff; border:none; border-radius:10px; box-shadow:0 6px 14px rgba(118,75,162,.3);">Ingresar</button>
+            <button onclick="hideLoginApp()" style="padding:10px 14px; background:#ffffff; color:#374151; border:1px solid #e5e7eb; border-radius:10px;">Cancelar</button>
+          </div>
+          <p id="loginAppError" class="muted" style="color:#c0392b; display:none; margin-top:10px; font-size:12px;">Error de autenticación</p>
+          <div style="margin-top:14px; color:#6b7280; font-size:11px;">
+            <span>Modo local offline habilitado por defecto.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      async function checkSessionAndPrompt(){
+        console.log('[panel] checkSessionAndPrompt called');
+        try {
+          console.log('[panel] window.api available:', !!window.api);
+          const session = await window.api?.getSession?.();
+          console.log('[panel] getSession result:', session);
+          if (session && session.user) {
+            const currentRole = await window.api?.getRole?.();
+            console.log('[panel] currentRole:', currentRole);
+            updateRoleUI(currentRole);
+          } else {
+            // Si no hay sesión activa, pedir credenciales
+            console.log('[panel] no active session, showing login modal');
+            showLoginApp();
+          }
+        } catch(e){ 
+          console.warn('getSession error:', e);
+          // En caso de error al obtener sesión, pedir login
+          showLoginApp();
+        }
+      }
+      function showLoginApp(){
+        console.log('[panel] showLoginApp');
+        const m = document.getElementById('loginAppModal');
+        if (m) m.style.display = 'flex';
+        const u = document.getElementById('appUsername');
+        const p = document.getElementById('appPassword');
+        if (u) u.value = '';
+        if (p) p.value = '';
+        const err = document.getElementById('loginAppError');
+        if (err) { err.style.display='none'; err.textContent=''; }
+      }
+      function hideLoginApp(){
+        console.log('[panel] hideLoginApp');
+        const m = document.getElementById('loginAppModal');
+        if (m) m.style.display = 'none';
+      }
+      async function attemptLoginApp(){
+        try {
+          console.log('[panel] attemptLoginApp - INICIO');
+          const btn = document.getElementById('btnLoginApp');
+          if (btn) { btn.disabled = true; btn.textContent = 'Ingresando...'; }
+
+          const username = document.getElementById('appUsername')?.value;
+          const password = document.getElementById('appPassword')?.value;
+
+          console.log('[panel] Intentando login:', username);
+          console.log('[panel] window.api.loginApp exists:', !!(window.api?.loginApp));
+
+          const result = await window.api?.loginApp?.(username, password);
+
+          console.log('[panel] Login resultado completo:', result);
+          console.log('[panel] result.success:', result?.success);
+          console.log('[panel] result.error:', result?.error);
+          console.log('[panel] result.user:', result?.user);
+
+          if (!result || !result.success) {
+            console.log('[panel] Login falló:', result?.error);
+            const err = document.getElementById('loginAppError');
+            if (err){ err.textContent = result?.error || 'Error desconocido'; err.style.display='block'; }
+            return;
+          }
+
+          console.log('[panel] Login exitoso, cerrando modal');
+          hideLoginApp();
+
+          // Actualizar UI con usuario
+          if (result.user) {
+            console.log('[panel] Usuario logueado:', result.user.email, result.user.role);
+            const role = String(result.user.role || 'MESA').toUpperCase();
+            console.log('[panel] role after login:', role);
+            updateRoleUI(role);
+            if (role === 'MESA') {
+              try { openView('mesa'); } catch {}
+            }
+          }
+
+        } catch(e){
+          console.error('[panel] Error en login:', e);
+          const err = document.getElementById('loginAppError');
+          if (err){ err.textContent = e?.message || String(e); err.style.display='block'; }
+        } finally {
+          const btn = document.getElementById('btnLoginApp');
+          if (btn) { btn.disabled = false; btn.textContent = 'Ingresar'; }
+        }
+      }
+      function updateRoleUI(role){
+        // Si ya existe lógica para ocultar/mostrar tarjetas por rol, reutilízala
+        try {
+          const r = String(role||'MESA').toUpperCase();
+          // ejemplo: document.querySelector('#cardCaja')?.classList.toggle('hidden', !(r==='CAJA'||r==='ADMIN'));
+        } catch {}
+      }
+      document.addEventListener('DOMContentLoaded', checkSessionAndPrompt);
+
+      async function logoutAndPrompt(){
+        try { await window.api?.logout?.(); } catch(e) {}
+        try { updateRoleUI('MESA'); } catch {}
+        showLoginApp();
+      }
+      try { window.api?.onLogoutRequest?.(() => logoutAndPrompt()); } catch {}
+
+      // Variables globales para auditoría
+      let vouchersData = [];
+      let filteredData = [];
+      let currentPage = 1;
+      const itemsPerPage = 20;
+
+      // Funciones de auditoría
+      async function loadAuditoriaData() {
+          try {
+              console.log('Cargando datos de auditoría...');
+              
+              // Simular carga de datos - en producción esto vendría de la API
+              const response = await window.api?.getAllVouchers?.() || [];
+              vouchersData = Array.isArray(response) ? response : [];
+              
+              // Si no hay API, usar datos de ejemplo
+              if (vouchersData.length === 0) {
+                  vouchersData = generarDatosEjemplo();
+              }
+              
+              filteredData = [...vouchersData];
+              currentPage = 1;
+              
+              actualizarTabla();
+              actualizarTotales();
+              actualizarPaginacion();
+              
+              console.log(`Cargados ${vouchersData.length} vouchers`);
+          } catch (error) {
+              console.error('Error cargando datos de auditoría:', error);
+              // Usar datos de ejemplo en caso de error
+              vouchersData = generarDatosEjemplo();
+              filteredData = [...vouchersData];
+              actualizarTabla();
+              actualizarTotales();
+              actualizarPaginacion();
+          }
+      }
+
+      function generarDatosEjemplo() {
+          const estados = ['activo', 'usado', 'cancelado', 'expirado'];
+          const monedas = ['DOP', 'USD'];
+          const usuarios = ['mesa1', 'mesa2', 'caja1', 'admin'];
+          const datos = [];
+          
+          for (let i = 1; i <= 50; i++) {
+              const fechaCreacion = new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000);
+              const estado = estados[Math.floor(Math.random() * estados.length)];
+              const moneda = monedas[Math.floor(Math.random() * monedas.length)];
+              const monto = moneda === 'USD' ? 
+                  Math.floor(Math.random() * 500) + 10 : 
+                  Math.floor(Math.random() * 25000) + 500;
+              
+              datos.push({
+                  id: i,
+                  code: `VCH${String(i).padStart(6, '0')}`,
+                  created_at: fechaCreacion.toISOString(),
+                  amount: monto,
+                  currency: moneda,
+                  estado: estado,
+                  used_at: estado === 'usado' ? new Date(fechaCreacion.getTime() + Math.random() * 7 * 24 * 60 * 60 * 1000).toISOString() : null,
+                  created_by: usuarios[Math.floor(Math.random() * usuarios.length)]
+              });
+          }
+          
+          return datos;
+      }
+
+      function aplicarFiltros() {
+          const fechaDesde = document.getElementById('fechaDesde').value;
+          const fechaHasta = document.getElementById('fechaHasta').value;
+          const estado = document.getElementById('filtroEstado').value;
+          const moneda = document.getElementById('filtroMoneda').value;
+          
+          filteredData = vouchersData.filter(voucher => {
+              let cumpleFiltros = true;
+              
+              // Filtro por fecha desde
+              if (fechaDesde) {
+                  const fechaVoucher = new Date(voucher.created_at);
+                  const fechaFiltro = new Date(fechaDesde);
+                  if (fechaVoucher < fechaFiltro) cumpleFiltros = false;
+              }
+              
+              // Filtro por fecha hasta
+              if (fechaHasta) {
+                  const fechaVoucher = new Date(voucher.created_at);
+                  const fechaFiltro = new Date(fechaHasta);
+                  fechaFiltro.setHours(23, 59, 59, 999); // Incluir todo el día
+                  if (fechaVoucher > fechaFiltro) cumpleFiltros = false;
+              }
+              
+              // Filtro por estado
+              if (estado && voucher.estado !== estado) cumpleFiltros = false;
+              
+              // Filtro por moneda
+              if (moneda && voucher.currency !== moneda) cumpleFiltros = false;
+              
+              return cumpleFiltros;
+          });
+          
+          currentPage = 1;
+          actualizarTabla();
+          actualizarTotales();
+          actualizarPaginacion();
+          
+          console.log(`Filtros aplicados: ${filteredData.length} de ${vouchersData.length} vouchers`);
+      }
+
+      function limpiarFiltros() {
+          document.getElementById('fechaDesde').value = '';
+          document.getElementById('fechaHasta').value = '';
+          document.getElementById('filtroEstado').value = '';
+          document.getElementById('filtroMoneda').value = '';
+          
+          filteredData = [...vouchersData];
+          currentPage = 1;
+          actualizarTabla();
+          actualizarTotales();
+          actualizarPaginacion();
+      }
+
+      function actualizarTabla() {
+          const tbody = document.getElementById('vouchersTableBody');
+          const startIndex = (currentPage - 1) * itemsPerPage;
+          const endIndex = startIndex + itemsPerPage;
+          const pageData = filteredData.slice(startIndex, endIndex);
+          
+          if (pageData.length === 0) {
+              tbody.innerHTML = '<tr><td colspan="8" class="loading">No hay datos para mostrar</td></tr>';
+              return;
+          }
+          
+          tbody.innerHTML = pageData.map(voucher => `
+              <tr>
+                  <td><strong>${voucher.code}</strong></td>
+                  <td>${formatearFecha(voucher.created_at)}</td>
+                  <td><strong>${formatearMonto(voucher.amount, voucher.currency)}</strong></td>
+                  <td>${voucher.currency}</td>
+                  <td><span class="estado-badge estado-${voucher.estado}">${voucher.estado.toUpperCase()}</span></td>
+                  <td>${voucher.used_at ? formatearFecha(voucher.used_at) : '-'}</td>
+                  <td>${voucher.created_by || '-'}</td>
+                  <td>
+                      ${voucher.estado === 'activo' ? 
+                          `<button onclick="cancelarVoucher('${voucher.code}')" class="action-btn">Cancelar</button>` : 
+                          '-'
+                      }
+                  </td>
+              </tr>
+          `).join('');
+      }
+
+      function actualizarTotales() {
+          const totales = filteredData.reduce((acc, voucher) => {
+              acc.total++;
+              
+              if (voucher.currency === 'DOP') {
+                  acc.totalDOP += voucher.amount;
+              } else if (voucher.currency === 'USD') {
+                  acc.totalUSD += voucher.amount;
+              }
+              
+              switch (voucher.estado) {
+                  case 'activo':
+                      acc.activos++;
+                      break;
+                  case 'usado':
+                      acc.usados++;
+                      break;
+                  case 'cancelado':
+                      acc.cancelados++;
+                      break;
+                  case 'expirado':
+                      acc.expirados++;
+                      break;
+              }
+              
+              return acc;
+          }, {
+              total: 0,
+              totalDOP: 0,
+              totalUSD: 0,
+              activos: 0,
+              usados: 0,
+              cancelados: 0,
+              expirados: 0
+          });
+          
+          document.getElementById('totalVouchers').textContent = totales.total.toLocaleString();
+          document.getElementById('totalDOPAuditoria').textContent = `RD$ ${totales.totalDOP.toLocaleString()}`;
+          document.getElementById('totalUSDAuditoria').textContent = `$ ${totales.totalUSD.toLocaleString()}`;
+          document.getElementById('totalActivos').textContent = totales.activos.toLocaleString();
+          document.getElementById('totalUsados').textContent = totales.usados.toLocaleString();
+          document.getElementById('totalCancelados').textContent = totales.cancelados.toLocaleString();
+      }
+
+      function actualizarPaginacion() {
+          const totalPages = Math.ceil(filteredData.length / itemsPerPage);
+          
+          document.getElementById('paginaInfo').textContent = `Página ${currentPage} de ${totalPages}`;
+          document.getElementById('btnAnterior').disabled = currentPage <= 1;
+          document.getElementById('btnSiguiente').disabled = currentPage >= totalPages;
+      }
+
+      function cambiarPagina(direccion) {
+          const totalPages = Math.ceil(filteredData.length / itemsPerPage);
+          const newPage = currentPage + direccion;
+          
+          if (newPage >= 1 && newPage <= totalPages) {
+              currentPage = newPage;
+              actualizarTabla();
+              actualizarPaginacion();
+          }
+      }
+
+      function formatearFecha(fechaISO) {
+          const fecha = new Date(fechaISO);
+          return fecha.toLocaleDateString('es-DO', {
+              year: 'numeric',
+              month: '2-digit',
+              day: '2-digit',
+              hour: '2-digit',
+              minute: '2-digit'
+          });
+      }
+
+      function formatearMonto(monto, moneda) {
+          const simbolo = moneda === 'USD' ? '$' : 'RD$';
+          return `${simbolo} ${monto.toLocaleString()}`;
+      }
+
+      async function cancelarVoucher(codigo) {
+          if (!confirm(`¿Está seguro de cancelar el voucher ${codigo}?`)) {
+              return;
+          }
+          
+          try {
+              // En producción, esto haría una llamada a la API
+              const result = await window.api?.cancelVoucher?.(codigo);
+              
+              if (result && result.success) {
+                  // Actualizar el estado local
+                  const voucher = vouchersData.find(v => v.code === codigo);
+                  if (voucher) {
+                      voucher.estado = 'cancelado';
+                  }
+                  
+                  // Actualizar filtros y tabla
+                  aplicarFiltros();
+                  alert('Voucher cancelado exitosamente');
+              } else {
+                  alert('Error al cancelar el voucher: ' + (result?.error || 'Error desconocido'));
+              }
+          } catch (error) {
+              console.error('Error cancelando voucher:', error);
+              alert('Error al cancelar el voucher');
+          }
+      }
+
+      // Funciones de exportación
+      function exportarCSV() {
+          const headers = ['Código', 'Fecha Creación', 'Monto', 'Moneda', 'Estado', 'Fecha Uso', 'Usuario'];
+          const csvContent = [
+              headers.join(','),
+              ...filteredData.map(voucher => [
+                  voucher.code,
+                  voucher.created_at,
+                  voucher.amount,
+                  voucher.currency,
+                  voucher.estado,
+                  voucher.used_at || '',
+                  voucher.created_by || ''
+              ].join(','))
+          ].join('\n');
+          
+          descargarArchivo(csvContent, 'vouchers-auditoria.csv', 'text/csv');
+      }
+
+      function exportarPDF() {
+          alert('Exportación a PDF no implementada aún');
+      }
+
+      function exportarExcel() {
+          alert('Exportación a Excel no implementada aún');
+      }
+
+      function descargarArchivo(contenido, nombreArchivo, tipoMime) {
+          const blob = new Blob([contenido], { type: tipoMime });
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = nombreArchivo;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          window.URL.revokeObjectURL(url);
+      }
+
+      // Inicializar fechas por defecto
+      document.addEventListener('DOMContentLoaded', () => {
+          const hoy = new Date();
+          const hace30Dias = new Date(hoy.getTime() - 30 * 24 * 60 * 60 * 1000);
+          
+          // No establecer fechas por defecto para permitir ver todos los datos
+          // document.getElementById('fechaDesde').value = hace30Dias.toISOString().split('T')[0];
+          // document.getElementById('fechaHasta').value = hoy.toISOString().split('T')[0];
+      });
+    </script>
+</body>
+</html>

@@ -84,79 +84,21 @@ function registerPrinterHandlers({ printer }) {
 
   ipcMain.handle('get-ticket-preview', async (event, previewData) => {
     try {
-      console.log('==========================================');
-      console.log('📄 GET-TICKET-PREVIEW');
-      console.log('==========================================');
-
-      // Obtener código del voucher (si fue proporcionado)
-      const providedCode = String(previewData?.ticket_number || previewData?.code || '').trim();
-      const lastFromMain = String(global.__lastTicketNumber || '').trim();
-
-      let ticket;
-      let ticketNumber;
-
-      if (providedCode || lastFromMain) {
-        // Si hay un código, buscarlo en BD
-        ticketNumber = providedCode || lastFromMain;
-        console.log('1️⃣ Buscando voucher en BD:', ticketNumber);
-
-        // Intentar obtener de BD si hay acceso
-        let dbTicket = null;
-        try {
-          const dbModule = require('../../../Caja/database');
-          const dbPath = require('path').join(require('electron').app.getPath('userData'), 'casino.db');
-          const db = new dbModule(dbPath);
-          dbTicket = db.getTicket(ticketNumber);
-          db.close();
-        } catch (e) {
-          console.warn('⚠️  No se pudo acceder a BD:', e.message);
-        }
-
-        if (dbTicket) {
-          console.log('2️⃣ Voucher encontrado en BD:', dbTicket.code);
-          ticket = {
-            ticket_number: dbTicket.code,
-            valor: Number(dbTicket.amount),
-            moneda: dbTicket.currency,
-            fecha_emision: dbTicket.fecha_emision,
-            mesa_id: dbTicket.mesa || previewData?.mesa_id || 'P01',
-            usuario_emision: previewData?.usuario_emision || 'Operador'
-          };
-        } else {
-          console.log('⚠️  Voucher NO encontrado en BD, usando datos temporales');
-          ticket = {
-            ticket_number: ticketNumber,
-            valor: Number(previewData?.valor ?? 0),
-            moneda: previewData?.moneda ?? 'DOP',
-            fecha_emision: new Date().toISOString(),
-            mesa_id: previewData?.mesa_id ?? 'P01',
-            usuario_emision: previewData?.usuario_emision ?? 'Operador',
-            operador_nombre: previewData?.operador_nombre || previewData?.usuario_emision || 'Operador'
-          };
-        }
-      } else {
-        // NO hay código todavía: Vista previa de SIMULACIÓN (antes de emitir)
-        console.log('📋 Vista previa de simulación (sin código real)');
-        ticket = {
-          ticket_number: '[SIN EMITIR]',
-          valor: Number(previewData?.valor ?? 0),
-          moneda: previewData?.moneda ?? 'DOP',
-          fecha_emision: new Date().toISOString(),
-          mesa_id: previewData?.mesa_id ?? 'P01',
-          usuario_emision: previewData?.usuario_emision ?? 'Operador',
-          operador_nombre: previewData?.operador_nombre || previewData?.usuario_emision || 'Operador'
-        };
-      }
-
-      console.log('3️⃣ Generando PDF con código:', ticket.ticket_number);
-      console.log('==========================================');
-
+      const now = new Date();
+      const ticketNumber = 'PREV-' + Math.floor((now.getTime() / 1000) % 1000000).toString().padStart(6, '0');
+      const ticket = {
+        ticket_number: ticketNumber,
+        valor: Number(previewData?.valor ?? 123.45),
+        moneda: (previewData?.moneda ?? 'DOP'),
+        fecha_emision: now.toISOString(),
+        mesa_id: previewData?.mesa_id ?? 'P01',
+        usuario_emision: previewData?.usuario_emision ?? 'VistaPrevia'
+      };
       const pageWidthMm = Number(previewData?.pageWidthMm ?? printer?.paperWidthMm ?? 80);
       const pageHeightMm = Number(previewData?.pageHeightMm ?? printer?.ticketHeightMm ?? 156);
       const buf = await generateTicketPDF({ ...ticket, pageWidthMm, pageHeightMm });
       const dataUrl = `data:application/pdf;base64,${buf.toString('base64')}`;
-
-      return { success: true, dataUrl, voucher_code: ticket.ticket_number };
+      return { success: true, dataUrl };
     } catch (error) {
       console.error('[IPC:get-ticket-preview] Error:', error.message);
       throw new Error(error.message);

@@ -1755,15 +1755,20 @@ try {
   console.warn('No se pudo cargar registerIpcHandlers, los handlers por IPC nativos no estarán disponibles:', e.message);
 }
 
-// Instanciar servicio de impresora para los handlers mínimos (sin usar app.getPath todavía)
+// Instanciar servicio de impresora para los handlers mínimos
 let printer;
-let PrinterService;
 try {
-  PrinterService = require(path.join(__dirname, '..', 'src', 'main', 'hardware', 'printer'));
-  // NO instanciar printer aquí porque requiere app.getPath
-  // Se inicializará dentro de app.whenReady()
+  const PrinterService = require(path.join(__dirname, '..', 'src', 'main', 'hardware', 'printer'));
+  printer = new PrinterService();
+  // Aplicar perfil persistido si existe
+  const profilePath = path.join(app.getPath('userData'), 'printerProfile.json');
+  if (fs.existsSync(profilePath)) {
+    const raw = fs.readFileSync(profilePath, 'utf8');
+    const saved = JSON.parse(raw);
+    printer.setProfile?.(saved);
+  }
 } catch (e) {
-  console.warn('No se pudo cargar PrinterService:', e.message);
+  console.warn('No se pudo instanciar PrinterService, funciones de impresión pueden no estar disponibles:', e.message);
 }
 
 async function tryRegisterPrinterOnly() {
@@ -1940,23 +1945,6 @@ app.whenReady().then(async () => {
     }
   } catch (e) {
     console.warn('⚠️  No se pudo inicializar Supabase Manager:', e.message);
-  }
-
-  // Inicializar Printer Service (ahora que app.getPath está disponible)
-  try {
-    if (PrinterService) {
-      printer = new PrinterService();
-      // Aplicar perfil persistido si existe
-      const profilePath = path.join(app.getPath('userData'), 'printerProfile.json');
-      if (fs.existsSync(profilePath)) {
-        const raw = fs.readFileSync(profilePath, 'utf8');
-        const saved = JSON.parse(raw);
-        printer.setProfile?.(saved);
-      }
-      console.log('✅ Printer Service inicializado');
-    }
-  } catch (e) {
-    console.warn('⚠️  No se pudo inicializar Printer Service:', e.message);
   }
 
   // HANDLERS DUPLICADOS COMENTADOS - Los handlers generate-ticket, validate-voucher, redeem-voucher

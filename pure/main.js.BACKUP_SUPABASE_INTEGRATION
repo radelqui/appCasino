@@ -1,0 +1,513 @@
+const { app, BrowserWindow, ipcMain } = require('electron');
+const path = require('path');
+const fs = require('fs');
+require('dotenv').config();
+const crypto = require('crypto');
+// Reutilizamos el preload existente para exponer window.api (definir temprano)
+const preloadPath = path.join(__dirname, '..', 'src', 'main', 'preload.js');
+// Flags de logging
+const VERBOSE = process.env.CASINO_VERBOSE === '1';
+const LOG_SCHEMA = process.env.CASINO_LOG_SCHEMA === '1';
+
+// Mitigar problemas de GPU en algunos equipos/VMs
+try {
+  app.disableHardwareAcceleration();
+  app.commandLine.appendSwitch('disable-gpu');
+  app.commandLine.appendSwitch('disable-gpu-compositing');
+} catch {}
+
+// ============================================
+// Base de datos unificada (misma ruta que Caja)
+// ============================================
+let db; // instancia de CasinoDatabase
+try {
+  const CasinoDatabase = require(path.join(__dirname, '..', 'Caja', 'database'));
+  const dbPath = process.env.CASINO_DB_PATH || process.env.SQLITE_DB_PATH || path.join(process.cwd(), 'data', 'casino.db');
+  db = new CasinoDatabase(dbPath);
+  // Asegurar columnas adicionales para Mesa/Operador en tickets
+  try {
+    const cols = db.db.prepare("PRAGMA table_info('tickets')").all().map(c => c.name);
+    const toAdd = [];
+    if (!cols.includes('mesa_nombre')) toAdd.push("ALTER TABLE tickets ADD COLUMN mesa_nombre TEXT");
+    if (!cols.includes('mesa_id')) toAdd.push("ALTER TABLE tickets ADD COLUMN mesa_id INTEGER");
+    if (!cols.includes('created_by_user_id')) toAdd.push("ALTER TABLE tickets ADD COLUMN created_by_user_id INTEGER");
+    if (!cols.includes('created_by_username')) toAdd.push("ALTER TABLE tickets ADD COLUMN created_by_username TEXT");
+    for (const sql of toAdd) { try { db.db.exec(sql); } catch {} }
+  } catch (e) {
+    if (VERBOSE) console.warn('No se pudieron asegurar columnas extra en tickets:', e?.message);
+  }
+  // Diagnóstico silenciable: esquema de BD
+  if (LOG_SCHEMA) {
+    try {
+      const tables = db.db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all();
+      console.log('📦 Tablas en SQLite:', tables.map(t => t.name).join(', '));
+      for (const t of tables) {
+        if (!t?.name) continue;
+        const info = db.db.prepare(`PRAGMA table_info(${t.name})`).all();
+        console.log(`🧩 PRAGMA table_info(${t.name}):`, info.map(c => `${c.name}:${c.type}`).join(', '));
+      }
+    } catch (e) {
+      if (VERBOSE) console.warn('No se pudo imprimir esquema de BD:', e?.message);
+    }
+  }
+} catch (e) {
+  console.warn('No se pudo inicializar la base de datos para auth/stats:', e.message);
+}
+
+// ============================================
+// SESIÓN GLOBAL
+// ============================================
+let currentSession = null;
+let mainWindow = null;
+// Modo de una sola ventana: no se mantiene registro de ventanas hijas
+
+// (Eliminado doResetPins temporal; login ya validado)
+
+// ============================================
+// HANDLER: auth:login (PBKDF2 10k iteraciones)
+// ============================================
+try {
+  ipcMain.handle('auth:login', async (_event, { username, password }) => {
+    try {
+      console.log('🔐 AUTH:LOGIN:', username);
+      const row = db?.db?.prepare(
+        `SELECT * FROM usuarios WHERE (username = ? OR email = ?) AND activo = 1`
+      ).get(String(username).trim(), String(username).trim());
+
+      if (!row) {
+        console.log('❌ Usuario no encontrado');
+        return { success: false, error: 'Usuario no encontrado' };
+      }
+      console.log('✅ Usuario encontrado:', row.username || row.email);
+      const hashedPassword = crypto
+        .pbkdf2Sync(String(password), Buffer.from(row.password_salt, 'hex'), 10000, 64, 'sha512')
+        .toString('hex');
+
+      console.log('🔑 Hash calculado:', (hashedPassword || '').substring(0, 20) + '...');
+      console.log('🔑 Hash en BD:    ', (row.password_hash || '').substring(0, 20) + '...');
+      if (hashedPassword !== row.password_hash) {
+        console.log('❌ Hashes NO coinciden - PIN incorrecto');
+        return { success: false, error: 'PIN incorrecto' };
+      }
+
+      try {
+        db?.db?.prepare('UPDATE usuarios SET last_login = CURRENT_TIMESTAMP WHERE id = ?').run(row.id);
+      } catch {}
+
+      currentSession = {
+        user: {
+          id: row.id,
+          email: row.email || row.username,
+          name: row.username,
+          role: row.role
+        }
+      };
+
+      console.log('✅ Hashes coinciden - Login exitoso');
+      console.log('✅ Retornando:', { user: currentSession.user });
+      return { success: true, user: currentSession.user };
+    } catch (error) {
+      console.error('❌ Error login:', error);
+      return { success: false, error: error.message };
+    }
+  });
+  // (Eliminado handler admin:reset-pins temporal)
+
+  // ============================================
+  // HANDLER: auth:get-session
+  // ============================================
+  ipcMain.handle('auth:get-session', async () => currentSession);
+
+  // ============================================
+  // HANDLER: get-role / set-role
+  // ============================================
+  ipcMain.handle('get-role', async () => currentSession?.user?.role || null);
+  ipcMain.handle('set-role', async (_event, role) => {
+    if (currentSession?.user) currentSession.user.role = String(role).toUpperCase();
+    return currentSession?.user?.role || null;
+  });
+
+  // ============================================
+  // HANDLER: auth:logout
+  // ============================================
+ipcMain.handle('auth:logout', async () => {
+  currentSession = null;
+  return { success: true };
+});
+
+// Abre una nueva ventana para una vista específica (mesa/caja/auditoria)
+// Eliminado: creación de nuevas ventanas por vista. Se carga el contenido en la ventana actual.
+
+// Handler para abrir vistas desde el panel (abre ventanas como antes)
+ipcMain.handle('open-view', async (event, viewName) => {
+  try {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (!win) return { success: false, error: 'Window not found' };
+
+    let normalized = String(viewName || '').toLowerCase();
+    if (!normalized) return { success: false, error: 'Parámetro viewName inválido' };
+    if (normalized === 'auditoria') normalized = 'auditor';
+
+    let filePath;
+    switch (normalized) {
+      case 'panel':
+        filePath = path.join(__dirname, '..', 'Caja', 'panel.html');
+        break;
+      case 'mesa':
+        // Usar archivo existente en pure
+        filePath = path.join(__dirname, 'mesa.html');
+        break;
+      case 'caja':
+        // Usar vista de Caja original
+        filePath = path.join(__dirname, '..', 'Caja', 'caja.html');
+        break;
+      case 'auditor':
+        // Vista auditor existente en pure
+        filePath = path.join(__dirname, 'auditor.html');
+        break;
+      default:
+        return { success: false, error: 'Vista desconocida' };
+    }
+
+    await win.loadFile(filePath);
+    if (VERBOSE) console.log(`✅ Vista ${normalized} cargada en ventana actual: ${filePath}`);
+    return { success: true, view: normalized };
+  } catch (error) {
+    console.error('❌ Error en open-view:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('back-to-panel', async (event) => {
+  try {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (!win) return { success: false };
+    const panelPath = path.join(__dirname, '..', 'Caja', 'panel.html');
+    await win.loadFile(panelPath);
+    if (VERBOSE) console.log('↩️  Volver al panel en la misma ventana');
+    return { success: true };
+  } catch (e) {
+    console.error('❌ Error en back-to-panel:', e);
+    return { success: false, error: e?.message };
+  }
+});
+
+// Compat: enfoque del panel (no-ops seguros en modelo de ventana única)
+ipcMain.handle('focus-panel', async (event) => {
+  try {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (win) { try { win.show(); win.focus(); } catch {} }
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e?.message };
+  }
+});
+
+// Compat: cerrar ventana actual (no cerrar en modo de una sola ventana)
+ipcMain.handle('close-current', async () => {
+  // No hacemos nada para evitar cerrar la única ventana
+  return { success: true };
+});
+
+// Salir de la app
+ipcMain.handle('exit-app', async () => {
+  try {
+    console.log('🚪 Cerrando aplicación');
+    app.quit();
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e?.message };
+  }
+});
+
+  // ============================================
+  // HANDLER: get-stats-today (usando tickets)
+  // ============================================
+  ipcMain.handle('get-stats-today', async () => {
+    try {
+      if (!db) throw new Error('DB no disponible');
+      const s = db.getStatsToday() || { ticketsHoy: 0, totalDOP: 0, totalUSD: 0, pendientes: 0 };
+      // Devolver alias para compatibilidad con distintas vistas (panel/caja)
+      return {
+        ...s,
+        ticketsToday: s.ticketsHoy ?? 0,
+        pending: s.pendientes ?? 0,
+      };
+    } catch (error) {
+      console.error('Error get-stats-today:', error?.message);
+      return { ticketsHoy: 0, totalDOP: 0, totalUSD: 0, pendientes: 0, ticketsToday: 0, pending: 0 };
+    }
+  });
+
+  // ============================================
+  // HANDLERS BÁSICOS: generación/validación/canje/estadísticas
+  // (Compatibilidad inmediata con el Panel)
+  // ============================================
+  ipcMain.handle('generate-ticket', async (_event, ticketData = {}) => {
+    try {
+      if (!db) throw new Error('DB no disponible');
+      console.log('📥 Recibiendo datos para crear ticket:', ticketData);
+      const amount = Number(ticketData.valor ?? ticketData.amount);
+      const currency = String(ticketData.moneda ?? ticketData.currency ?? 'DOP').toUpperCase();
+      const mesa = ticketData.mesa_id ?? ticketData.mesa ?? (ticketData.mesa_nombre || 'M01');
+      if (!amount || amount <= 0) throw new Error('El valor debe ser mayor que cero');
+      if (!['DOP','USD'].includes(currency)) throw new Error('Moneda inválida');
+      const res = db.createTicket({ amount, currency, mesa, usuario_emision: ticketData.usuario_emision || null });
+      // Enriquecer con mesa_id y datos del operador si hay sesión
+      try {
+        const user = (typeof currentSession === 'object' && currentSession && currentSession.user) ? currentSession.user : null;
+        const mesaId = ticketData.mesa_id || null;
+        const createdByUserId = user?.id || null;
+        const createdByUsername = ticketData.operador_nombre || ticketData.created_by_username || user?.email || user?.name || null;
+        const mesaNombre = ticketData.mesa_nombre || null;
+        db.db.prepare(
+          'UPDATE tickets SET mesa_id = COALESCE(?, mesa_id), created_by_user_id = COALESCE(?, created_by_user_id), created_by_username = COALESCE(?, created_by_username), mesa_nombre = COALESCE(?, mesa_nombre) WHERE code = ?'
+        ).run(mesaId, createdByUserId, createdByUsername, mesaNombre, res.ticket_number);
+      } catch (e) {
+        if (VERBOSE) console.warn('No se pudo actualizar mesa/operador en ticket:', e?.message);
+      }
+      console.log('✅ Ticket guardado en BD:', { code: res.ticket_number, amount, currency, mesa: ticketData.mesa_nombre || mesa, operador: ticketData.operador_nombre || null });
+      return {
+        success: true,
+        ticket: {
+          id: res.id || null,
+          code: res.ticket_number,
+          amount,
+          currency,
+          mesa: ticketData.mesa_nombre || mesa,
+          operador: ticketData.operador_nombre || null
+        }
+      };
+    } catch (e) {
+      console.error('[generate-ticket] Error:', e?.message);
+      return { success: false, error: e?.message || String(e) };
+    }
+  });
+
+  ipcMain.handle('validate-voucher', async (_event, voucherCode) => {
+    try {
+      if (!db) throw new Error('DB no disponible');
+      const code = String(voucherCode || '').toUpperCase().trim();
+      if (!code) throw new Error('Código requerido');
+
+      // Usar tabla tickets con esquema correcto
+      let rowData = null;
+      let mesaNombre = 'N/A';
+      let operadorNombre = null;
+      try {
+        const info = db.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='tickets'").get();
+        if (info) {
+          // Solo consultar tickets; evitar JOIN a tablas opcionales para no romper en BDs sin 'usuarios'
+          const row = db.db.prepare(`
+            SELECT * FROM tickets WHERE code = ?
+          `).get(code);
+          if (row) {
+            mesaNombre = row.mesa_nombre || row.mesa || (row.mesa_id ? String(row.mesa_id) : 'N/A');
+            // Derivar operador desde columnas disponibles en la misma tabla
+            operadorNombre = row.created_by_username 
+                              || row.operador_nombre 
+                              || row.usuario_emision 
+                              || row.created_by_email 
+                              || row.operador_email 
+                              || null;
+            rowData = row;
+          }
+        }
+      } catch (_) { /* fallback abajo */ }
+
+      if (!rowData) return { success: false, valid: false, error: 'Voucher no encontrado' };
+      // Validaciones básicas de estado
+      const estado = String(rowData.estado || 'emitido').toLowerCase();
+      if (estado === 'usado') return { success: false, valid: false, estado: 'usado', error: 'Voucher canjeado' };
+      if (estado === 'cancelado') return { success: false, valid: false, estado: 'cancelado', error: 'Voucher cancelado' };
+      if (estado === 'expirado') return { success: false, valid: false, estado: 'expirado', error: 'Voucher expirado' };
+
+      console.log('📋 Ticket encontrado:', {
+        code: rowData.code,
+        amount: rowData.amount,
+        currency: rowData.currency,
+        mesa: mesaNombre,
+        operador: operadorNombre
+      });
+
+      return {
+        success: true,
+        valid: true,
+        ticket: {
+          code: rowData.code,
+          amount: Number(rowData.amount || 0),
+          currency: rowData.currency || 'DOP',
+          estado: rowData.estado || 'emitido',
+          created_at: rowData.created_at || rowData.fecha_emision || null,
+          mesa: mesaNombre || 'N/A',
+          operador: operadorNombre || 'N/A'
+        }
+      };
+    } catch (e) {
+      console.error('[validate-voucher] Error:', e?.message);
+      return { success: false, error: e?.message || String(e) };
+    }
+  });
+
+  ipcMain.handle('redeem-voucher', async (_event, code, cajeroId = 'CAJA-01') => {
+    try {
+      if (!db) throw new Error('DB no disponible');
+      const normalized = String(code || '').toUpperCase().trim();
+      if (!normalized) throw new Error('Código requerido');
+      const res = db.redeemTicket(normalized, cajeroId);
+      return res;
+    } catch (e) {
+      console.error('[redeem-voucher] Error:', e?.message);
+      return { success: false, error: e?.message || String(e) };
+    }
+  });
+
+  ipcMain.handle('get-statistics', async () => {
+    try {
+      if (!db?.db) throw new Error('DB no disponible');
+      // Filtrar por fecha de HOY usando fecha_emision
+      const totalTickets = db.db.prepare(`
+        SELECT COUNT(*) AS total
+        FROM tickets
+        WHERE DATE(fecha_emision) = DATE('now','localtime')
+      `).get().total || 0;
+
+      const totalDOP = db.db.prepare(`
+        SELECT COALESCE(SUM(amount),0) AS total
+        FROM tickets
+        WHERE currency = 'DOP' AND DATE(fecha_emision) = DATE('now','localtime')
+      `).get().total || 0;
+
+      const totalUSD = db.db.prepare(`
+        SELECT COALESCE(SUM(amount),0) AS total
+        FROM tickets
+        WHERE currency = 'USD' AND DATE(fecha_emision) = DATE('now','localtime')
+      `).get().total || 0;
+
+      const pendientes = db.db.prepare(`
+        SELECT COUNT(*) AS total
+        FROM tickets
+        WHERE estado != 'usado' AND DATE(fecha_emision) = DATE('now','localtime')
+      `).get().total || 0;
+
+      const stats = { ticketsHoy: totalTickets, totalDOP, totalUSD, pendientes };
+      return { success: true, stats };
+    } catch (e) {
+      console.error('[get-statistics] Error:', e?.message);
+      return { success: false, error: e?.message || String(e) };
+    }
+  });
+
+  // Handler temporal: limpiar la base de datos (solo tickets)
+  ipcMain.handle('reset-database', async () => {
+    try {
+      if (!db?.db) throw new Error('DB no disponible');
+      db.db.prepare('DELETE FROM tickets').run();
+      try { db.db.prepare('DELETE FROM sqlite_sequence WHERE name = "tickets"').run(); } catch {}
+      if (VERBOSE) console.log('✅ Base de datos limpiada (tabla tickets)');
+      return { success: true, message: 'BD limpiada correctamente' };
+    } catch (error) {
+      console.error('❌ Error limpiando BD:', error?.message);
+      return { success: false, error: error?.message };
+    }
+  });
+
+  if (VERBOSE) console.log('✅ Handlers auth/rol/stats registrados');
+  if (VERBOSE) console.log('✅ Handlers vouchers básicos registrados (generate/validate/redeem/stats)');
+} catch (e) {
+  console.warn('No se pudieron registrar handlers de auth/rol/stats:', e.message);
+}
+
+// (preloadPath definido al inicio del archivo)
+
+// Servicios opcionales existentes (impresora, DB, IPC)
+let registerIpcHandlers;
+try {
+  registerIpcHandlers = require(path.join(__dirname, '..', 'src', 'main', 'ipc'));
+} catch (e) {
+  console.warn('No se pudo cargar registerIpcHandlers, los handlers por IPC nativos no estarán disponibles:', e.message);
+}
+
+// Instanciar servicio de impresora para los handlers mínimos
+let printer;
+try {
+  const PrinterService = require(path.join(__dirname, '..', 'src', 'main', 'hardware', 'printer'));
+  printer = new PrinterService();
+  // Aplicar perfil persistido si existe
+  const profilePath = path.join(app.getPath('userData'), 'printerProfile.json');
+  if (fs.existsSync(profilePath)) {
+    const raw = fs.readFileSync(profilePath, 'utf8');
+    const saved = JSON.parse(raw);
+    printer.setProfile?.(saved);
+  }
+} catch (e) {
+  console.warn('No se pudo instanciar PrinterService, funciones de impresión pueden no estar disponibles:', e.message);
+}
+
+async function tryRegisterPrinterOnly() {
+  try {
+    const printerHandlersPath = path.join(__dirname, '..', 'src', 'main', 'ipc', 'printerHandlers.js');
+    const mod = require(printerHandlersPath);
+    if (mod && typeof mod.registerPrinterHandlers === 'function') {
+      await mod.registerPrinterHandlers({ printer });
+      return true;
+    }
+    if (typeof mod === 'function') {
+      await mod({ printer });
+      return true;
+    }
+    if (mod && typeof mod.default === 'function') {
+      await mod.default({ printer });
+      return true;
+    }
+  } catch (e) {
+    console.warn('No se pudieron registrar handlers de impresora de forma directa:', e.message);
+  }
+  return false;
+}
+
+function createWindow() {
+  const win = new BrowserWindow({
+    width: 1000,
+    height: 700,
+    webPreferences: {
+      preload: preloadPath,
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+    },
+    show: true,
+  });
+  mainWindow = win;
+  // Iniciar directamente en el Panel principal como antes
+  win.loadFile(path.join(__dirname, '..', 'Caja', 'panel.html'));
+}
+
+app.whenReady().then(async () => {
+  try {
+    if (typeof registerIpcHandlers === 'function') {
+      // Si el proyecto espera argumentos, intenta con objetos mínimos.
+      await registerIpcHandlers({ db, printer });
+    } else {
+      // Registrar handlers mínimos de impresora para preview/print
+      await tryRegisterPrinterOnly();
+    }
+  } catch (e) {
+    console.warn('Fallo al registrar handlers IPC:', e.message);
+    await tryRegisterPrinterOnly();
+  }
+
+  // (Autorun reset de PINs eliminado tras validación del login)
+
+  createWindow();
+
+  app.on('activate', () => {
+    if (BrowserWindow.getAllWindows().length === 0) {
+      createWindow();
+    }
+  });
+});
+
+app.on('window-all-closed', () => {
+  if (process.platform !== 'darwin') app.quit();
+});

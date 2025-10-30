@@ -39,8 +39,8 @@ class PrinterService {
       if (input instanceof Buffer) {
         pdfBuffer = input;
       } else if (input && typeof input === 'object') {
-        const { ticket_number, valor, moneda, fecha_emision, qr_code, mesa_id, usuario_emision } = input;
-        pdfBuffer = await generateTicketPDF({ ticket_number, valor, moneda, fecha_emision, qr_code, mesa_id, usuario_emision, pageWidthMm: this.paperWidthMm, pageHeightMm: this.ticketHeightMm });
+        const { ticket_number, valor, moneda, fecha_emision, qr_code, mesa_id, usuario_emision, operador_nombre } = input;
+        pdfBuffer = await generateTicketPDF({ ticket_number, valor, moneda, fecha_emision, qr_code, mesa_id, usuario_emision, operador_nombre, pageWidthMm: this.paperWidthMm, pageHeightMm: this.ticketHeightMm });
       } else {
         console.warn('[Printer:PDF] Entrada inválida, se omite impresión');
         return false;
@@ -91,7 +91,7 @@ class PrinterService {
         return false;
       }
 
-      const { ticket_number, valor, moneda, fecha_emision, mesa_id, usuario_emision } = data;
+      const { ticket_number, valor, moneda, fecha_emision, mesa_id, usuario_emision, operador_nombre } = data;
       const { qrString } = await generateTicketQR({ id: ticket_number, valor: Number(valor), moneda, fecha: fecha_emision });
 
       // Header
@@ -118,6 +118,7 @@ class PrinterService {
       printer.println(`FECHA: ${new Date(fecha_emision).toLocaleString()}`);
       printer.println(`TICKET #: ${ticket_number}`);
       printer.println(`MESA: ${mesa_id || '---'}`);
+      printer.println(`OPERADOR: ${operador_nombre || usuario_emision || '---'}`);
       printer.newLine();
 
       // Amount (en letras + numérico)

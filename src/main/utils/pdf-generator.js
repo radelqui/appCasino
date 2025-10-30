@@ -75,7 +75,7 @@ async function embedPngFromDataUrl(pdfDoc, dataUrl) {
   return await pdfDoc.embedPng(bytes);
 }
 
-async function generateTicketPDF({ ticket_number, valor, moneda, fecha_emision, qr_code, mesa_id, usuario_emision, pageWidthMm, pageHeightMm }) {
+async function generateTicketPDF({ ticket_number, valor, moneda, fecha_emision, qr_code, mesa_id, usuario_emision, operador_nombre, pageWidthMm, pageHeightMm }) {
   if (!ticket_number) throw new Error('Invalid ticket data');
 
   const pdfDoc = await PDFDocument.create();
@@ -94,7 +94,7 @@ async function generateTicketPDF({ ticket_number, valor, moneda, fecha_emision, 
   estimatedPt += 12 + 80; // gap previo al QR + altura QR (aprox en pt)
   estimatedPt += mmToPt(3); // espacio entre QR y número de ticket
   estimatedPt += 15; // separación entre número y bloque de información
-  estimatedPt += 4 * 12; // FECHA/HORA/TICKET/MESA con 12pt entre líneas
+  estimatedPt += 5 * 12; // FECHA/HORA/TICKET/MESA/OPERADOR con 12pt entre líneas
   estimatedPt += 15; // antes de monto en letras
   estimatedPt += mmToPt(5); // espacio tras línea 1 letras
   if (hasSecondLine) estimatedPt += mmToPt(5); // espacio tras línea 2 letras
@@ -154,16 +154,18 @@ async function generateTicketPDF({ ticket_number, valor, moneda, fecha_emision, 
   const ticketStr = String(ticket_number);
   page.drawText(ticketStr, { x: centerText(ticketStr, fontMono, 9, width), y, size: 9, font: fontMono });
   
-  // Información: FECHA, HORA, TICKET, MESA (cada una en su propia línea)
+  // Información: FECHA, HORA, TICKET, MESA, OPERADOR (cada una en su propia línea)
   y -= 15; // separación entre número y bloque de información
   const d = new Date(fecha_emision);
   const fechaStr = `${d.getDate().toString().padStart(2,'0')}/${(d.getMonth()+1).toString().padStart(2,'0')}/${d.getFullYear()}`;
   const horaStr = `${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;
+  const operadorStr = String(operador_nombre || usuario_emision || '---');
   const infoLines = [
     `FECHA: ${fechaStr}`,
     `HORA: ${horaStr}`,
     `TICKET #: ${ticket_number}`,
     `MESA: ${mesa_id || '---'}`,
+    `OPERADOR: ${operadorStr}`,
   ];
   const lineSpacingPt = 12;
   for (const line of infoLines) {
