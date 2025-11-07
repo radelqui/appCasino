@@ -1,0 +1,983 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Configuración de Seguridad - Sistema TITO</title>
+  <link rel="stylesheet" href="./style.css">
+  <style>
+    body {
+      font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+      margin: 0;
+      padding: 0;
+      background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    .header {
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+
+    .header h1 {
+      margin: 0;
+      font-size: 28px;
+      color: #1e293b;
+    }
+
+    .header p {
+      margin: 8px 0 0 0;
+      color: #64748b;
+      font-size: 14px;
+    }
+
+    .section {
+      background: rgba(255, 255, 255, 0.95);
+      padding: 24px;
+      border-radius: 12px;
+      margin-bottom: 20px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+
+    .section h2 {
+      margin: 0 0 20px 0;
+      font-size: 20px;
+      color: #1e293b;
+      border-bottom: 2px solid #e2e8f0;
+      padding-bottom: 12px;
+    }
+
+    .setting-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px;
+      background: #f8fafc;
+      border-radius: 8px;
+      margin-bottom: 12px;
+      transition: all 0.2s;
+    }
+
+    .setting-row:hover {
+      background: #f1f5f9;
+    }
+
+    .setting-info strong {
+      display: block;
+      color: #1e293b;
+      font-size: 15px;
+      margin-bottom: 4px;
+    }
+
+    .setting-info p {
+      margin: 0;
+      font-size: 13px;
+      color: #64748b;
+    }
+
+    .toggle-switch {
+      position: relative;
+      display: inline-block;
+      width: 52px;
+      height: 28px;
+    }
+
+    .toggle-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: #cbd5e1;
+      transition: .3s;
+      border-radius: 28px;
+    }
+
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 20px;
+      width: 20px;
+      left: 4px;
+      bottom: 4px;
+      background-color: white;
+      transition: .3s;
+      border-radius: 50%;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+
+    input:checked + .slider {
+      background-color: #10b981;
+    }
+
+    input:checked + .slider:before {
+      transform: translateX(24px);
+    }
+
+    .form-input {
+      padding: 10px 14px;
+      border: 2px solid #e2e8f0;
+      border-radius: 8px;
+      width: 100px;
+      font-size: 14px;
+      transition: border-color 0.2s;
+    }
+
+    .form-input:focus {
+      outline: none;
+      border-color: #3b82f6;
+    }
+
+    .btn {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 500;
+      font-size: 14px;
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    }
+
+    .btn-primary {
+      background: #3b82f6;
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: #2563eb;
+    }
+
+    .btn-danger {
+      background: #ef4444;
+      color: white;
+    }
+
+    .btn-danger:hover {
+      background: #dc2626;
+    }
+
+    .btn-secondary {
+      background: #64748b;
+      color: white;
+    }
+
+    .btn-secondary:hover {
+      background: #475569;
+    }
+
+    .btn-success {
+      background: #10b981;
+      color: white;
+    }
+
+    .btn-success:hover {
+      background: #059669;
+    }
+
+    .session-item, .ip-item {
+      padding: 14px;
+      background: white;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      margin-bottom: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      transition: all 0.2s;
+    }
+
+    .session-item:hover, .ip-item:hover {
+      border-color: #cbd5e1;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 40px 20px;
+      color: #94a3b8;
+    }
+
+    .empty-state-icon {
+      font-size: 48px;
+      margin-bottom: 12px;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 600;
+      margin-left: 8px;
+    }
+
+    .badge-success {
+      background: #d1fae5;
+      color: #065f46;
+    }
+
+    .badge-warning {
+      background: #fef3c7;
+      color: #92400e;
+    }
+
+    .badge-danger {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+      color: white;
+      padding: 20px;
+      border-radius: 10px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 32px;
+      font-weight: bold;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 13px;
+      opacity: 0.9;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div>
+        <h1>🔒 Configuración de Seguridad</h1>
+        <p>Gestionar políticas de seguridad y control de acceso del sistema</p>
+      </div>
+      <div style="display: flex; gap: 10px;">
+        <button onclick="guardarConfig()" class="btn btn-success">💾 Guardar Cambios</button>
+        <button onclick="volverConfig()" class="btn btn-secondary">← Volver</button>
+      </div>
+    </div>
+
+    <!-- Estadísticas de Seguridad -->
+    <div class="section">
+      <h2>📊 Estado de Seguridad</h2>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-value" id="stat-sessions">0</div>
+          <div class="stat-label">Sesiones Activas</div>
+        </div>
+        <div class="stat-card" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);">
+          <div class="stat-value" id="stat-blocked">0</div>
+          <div class="stat-label">IPs Bloqueadas</div>
+        </div>
+        <div class="stat-card" style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);">
+          <div class="stat-value" id="stat-failed">0</div>
+          <div class="stat-label">Intentos Fallidos (24h)</div>
+        </div>
+        <div class="stat-card" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);">
+          <div class="stat-value" id="stat-backups">0</div>
+          <div class="stat-label">Backups Realizados</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Políticas de Contraseña -->
+    <div class="section">
+      <h2>🔑 Políticas de Contraseña</h2>
+
+      <div class="setting-row">
+        <div class="setting-info">
+          <strong>Longitud mínima de contraseña</strong>
+          <p>Número mínimo de caracteres requeridos</p>
+        </div>
+        <input type="number" id="pwd-min-length" value="8" min="4" max="32" class="form-input">
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-info">
+          <strong>Requerir letras mayúsculas</strong>
+          <p>Al menos una letra mayúscula (A-Z)</p>
+        </div>
+        <label class="toggle-switch">
+          <input type="checkbox" id="pwd-uppercase" checked>
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-info">
+          <strong>Requerir números</strong>
+          <p>Al menos un dígito numérico (0-9)</p>
+        </div>
+        <label class="toggle-switch">
+          <input type="checkbox" id="pwd-numbers" checked>
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-info">
+          <strong>Requerir caracteres especiales</strong>
+          <p>Al menos un símbolo (!@#$%^&*)</p>
+        </div>
+        <label class="toggle-switch">
+          <input type="checkbox" id="pwd-special">
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-info">
+          <strong>Expiración de contraseña</strong>
+          <p>Días antes de requerir cambio (0 = nunca)</p>
+        </div>
+        <input type="number" id="pwd-expiration" value="90" min="0" max="365" class="form-input">
+      </div>
+    </div>
+
+    <!-- Gestión de Sesiones -->
+    <div class="section">
+      <h2>👤 Gestión de Sesiones</h2>
+
+      <div class="setting-row">
+        <div class="setting-info">
+          <strong>Tiempo de inactividad máximo</strong>
+          <p>Minutos antes de logout automático por inactividad</p>
+        </div>
+        <input type="number" id="session-timeout" value="30" min="5" max="240" class="form-input">
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-info">
+          <strong>Permitir sesiones simultáneas</strong>
+          <p>Mismo usuario en múltiples estaciones</p>
+        </div>
+        <label class="toggle-switch">
+          <input type="checkbox" id="session-multiple">
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-info">
+          <strong>Registro de actividad de sesión</strong>
+          <p>Guardar log detallado de acciones por sesión</p>
+        </div>
+        <label class="toggle-switch">
+          <input type="checkbox" id="session-logging" checked>
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div style="margin-top: 24px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+          <h3 style="margin: 0;">Sesiones Activas</h3>
+          <button onclick="cargarSesionesActivas()" class="btn btn-secondary" style="padding: 6px 12px;">
+            🔄 Actualizar
+          </button>
+        </div>
+        <div id="active-sessions">
+          <div class="empty-state">
+            <div class="empty-state-icon">⏳</div>
+            <div>Cargando sesiones...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Control de Intentos Fallidos -->
+    <div class="section">
+      <h2>🚫 Control de Intentos de Login</h2>
+
+      <div class="setting-row">
+        <div class="setting-info">
+          <strong>Máximo de intentos fallidos</strong>
+          <p>Intentos permitidos antes de bloquear la cuenta/IP</p>
+        </div>
+        <input type="number" id="login-max-attempts" value="3" min="1" max="10" class="form-input">
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-info">
+          <strong>Tiempo de bloqueo</strong>
+          <p>Minutos que la cuenta/IP permanece bloqueada</p>
+        </div>
+        <input type="number" id="login-lockout" value="15" min="1" max="1440" class="form-input">
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-info">
+          <strong>Notificar intentos fallidos</strong>
+          <p>Enviar alerta al administrador tras bloqueo</p>
+        </div>
+        <label class="toggle-switch">
+          <input type="checkbox" id="login-notify" checked>
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div style="margin-top: 24px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+          <h3 style="margin: 0;">IPs Bloqueadas</h3>
+          <button onclick="cargarIPsBloqueadas()" class="btn btn-secondary" style="padding: 6px 12px;">
+            🔄 Actualizar
+          </button>
+        </div>
+        <div id="blocked-ips">
+          <div class="empty-state">
+            <div class="empty-state-icon">⏳</div>
+            <div>Cargando IPs bloqueadas...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Backup Automático -->
+    <div class="section">
+      <h2>💾 Respaldo Automático</h2>
+
+      <div class="setting-row">
+        <div class="setting-info">
+          <strong>Activar backup automático</strong>
+          <p>Realizar copias de seguridad automáticas de la base de datos</p>
+        </div>
+        <label class="toggle-switch">
+          <input type="checkbox" id="backup-enabled" checked>
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-info">
+          <strong>Frecuencia de backup</strong>
+          <p>Horas entre cada backup automático</p>
+        </div>
+        <input type="number" id="backup-frequency" value="24" min="1" max="168" class="form-input">
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-info">
+          <strong>Backups a mantener</strong>
+          <p>Número de copias de seguridad a conservar</p>
+        </div>
+        <input type="number" id="backup-keep" value="30" min="1" max="365" class="form-input">
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-info">
+          <strong>Encriptar backups</strong>
+          <p>Cifrar archivos de backup con AES-256</p>
+        </div>
+        <label class="toggle-switch">
+          <input type="checkbox" id="backup-encrypt" checked>
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div style="margin-top: 16px; padding: 16px; background: #f8fafc; border-radius: 8px;">
+        <button onclick="realizarBackupManual()" class="btn btn-primary">
+          💾 Realizar Backup Ahora
+        </button>
+        <button onclick="restaurarBackup()" class="btn btn-secondary" style="margin-left: 10px;">
+          ⬆️ Restaurar desde Backup
+        </button>
+      </div>
+    </div>
+
+    <!-- Auditoría y Logs -->
+    <div class="section">
+      <h2>📋 Auditoría y Logs</h2>
+
+      <div class="setting-row">
+        <div class="setting-info">
+          <strong>Nivel de auditoría</strong>
+          <p>Detalle de eventos a registrar en logs</p>
+        </div>
+        <select id="audit-level" class="form-input" style="width: 150px;">
+          <option value="minimal">Mínimo</option>
+          <option value="normal" selected>Normal</option>
+          <option value="verbose">Detallado</option>
+          <option value="debug">Debug</option>
+        </select>
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-info">
+          <strong>Retención de logs</strong>
+          <p>Días que se conservan los registros de auditoría</p>
+        </div>
+        <input type="number" id="audit-retention" value="365" min="30" max="3650" class="form-input">
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-info">
+          <strong>Alertas de eventos críticos</strong>
+          <p>Notificar inmediatamente eventos de seguridad críticos</p>
+        </div>
+        <label class="toggle-switch">
+          <input type="checkbox" id="audit-alerts" checked>
+          <span class="slider"></span>
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let config = {};
+    let stats = {
+      sessions: 0,
+      blocked: 0,
+      failed: 0,
+      backups: 0
+    };
+
+    // ============================================
+    // INICIALIZACIÓN
+    // ============================================
+    async function init() {
+      console.log('🔒 Iniciando módulo de Seguridad...');
+
+      try {
+        // Cargar configuración
+        await cargarConfig();
+
+        // Cargar estadísticas
+        await cargarEstadisticas();
+
+        // Cargar datos dinámicos
+        await Promise.all([
+          cargarSesionesActivas(),
+          cargarIPsBloqueadas()
+        ]);
+
+        console.log('✅ Módulo de Seguridad inicializado');
+      } catch (error) {
+        console.error('❌ Error al inicializar:', error);
+      }
+    }
+
+    // ============================================
+    // CARGAR CONFIGURACIÓN
+    // ============================================
+    async function cargarConfig() {
+      try {
+        const result = await window.api?.invoke('security:get-config');
+
+        if (result?.success) {
+          config = result.config;
+          aplicarConfig();
+        } else {
+          console.warn('No se pudo cargar configuración, usando valores por defecto');
+          config = getDefaultConfig();
+          aplicarConfig();
+        }
+      } catch (error) {
+        console.error('Error cargando config:', error);
+        config = getDefaultConfig();
+        aplicarConfig();
+      }
+    }
+
+    function getDefaultConfig() {
+      return {
+        password: {
+          minLength: 8,
+          requireUppercase: true,
+          requireNumbers: true,
+          requireSpecial: false,
+          expirationDays: 90
+        },
+        session: {
+          inactivityTimeout: 30,
+          allowMultipleSessions: false,
+          logging: true
+        },
+        login: {
+          maxAttempts: 3,
+          lockoutMinutes: 15,
+          notifyOnBlock: true
+        },
+        backup: {
+          enabled: true,
+          frequencyHours: 24,
+          keepCount: 30,
+          encrypt: true
+        },
+        audit: {
+          level: 'normal',
+          retentionDays: 365,
+          criticalAlerts: true
+        }
+      };
+    }
+
+    function aplicarConfig() {
+      // Contraseña
+      document.getElementById('pwd-min-length').value = config.password?.minLength || 8;
+      document.getElementById('pwd-uppercase').checked = config.password?.requireUppercase !== false;
+      document.getElementById('pwd-numbers').checked = config.password?.requireNumbers !== false;
+      document.getElementById('pwd-special').checked = config.password?.requireSpecial || false;
+      document.getElementById('pwd-expiration').value = config.password?.expirationDays || 90;
+
+      // Sesión
+      document.getElementById('session-timeout').value = config.session?.inactivityTimeout || 30;
+      document.getElementById('session-multiple').checked = config.session?.allowMultipleSessions || false;
+      document.getElementById('session-logging').checked = config.session?.logging !== false;
+
+      // Login
+      document.getElementById('login-max-attempts').value = config.login?.maxAttempts || 3;
+      document.getElementById('login-lockout').value = config.login?.lockoutMinutes || 15;
+      document.getElementById('login-notify').checked = config.login?.notifyOnBlock !== false;
+
+      // Backup
+      document.getElementById('backup-enabled').checked = config.backup?.enabled !== false;
+      document.getElementById('backup-frequency').value = config.backup?.frequencyHours || 24;
+      document.getElementById('backup-keep').value = config.backup?.keepCount || 30;
+      document.getElementById('backup-encrypt').checked = config.backup?.encrypt !== false;
+
+      // Auditoría
+      document.getElementById('audit-level').value = config.audit?.level || 'normal';
+      document.getElementById('audit-retention').value = config.audit?.retentionDays || 365;
+      document.getElementById('audit-alerts').checked = config.audit?.criticalAlerts !== false;
+    }
+
+    // ============================================
+    // ESTADÍSTICAS
+    // ============================================
+    async function cargarEstadisticas() {
+      try {
+        const result = await window.api?.invoke('security:get-stats');
+
+        if (result?.success) {
+          stats = result.stats;
+          actualizarEstadisticas();
+        }
+      } catch (error) {
+        console.warn('No se pudieron cargar estadísticas:', error);
+      }
+    }
+
+    function actualizarEstadisticas() {
+      document.getElementById('stat-sessions').textContent = stats.sessions || 0;
+      document.getElementById('stat-blocked').textContent = stats.blocked || 0;
+      document.getElementById('stat-failed').textContent = stats.failed || 0;
+      document.getElementById('stat-backups').textContent = stats.backups || 0;
+    }
+
+    // ============================================
+    // SESIONES ACTIVAS
+    // ============================================
+    async function cargarSesionesActivas() {
+      const container = document.getElementById('active-sessions');
+
+      try {
+        const result = await window.api?.invoke('security:get-active-sessions');
+
+        if (!result?.success || !result.sessions || result.sessions.length === 0) {
+          container.innerHTML = `
+            <div class="empty-state">
+              <div class="empty-state-icon">👥</div>
+              <div>No hay sesiones activas en este momento</div>
+            </div>
+          `;
+          stats.sessions = 0;
+          actualizarEstadisticas();
+          return;
+        }
+
+        stats.sessions = result.sessions.length;
+        actualizarEstadisticas();
+
+        container.innerHTML = '';
+        result.sessions.forEach(session => {
+          const div = document.createElement('div');
+          div.className = 'session-item';
+
+          const timeAgo = calcularTiempoTranscurrido(session.loginAt);
+
+          div.innerHTML = `
+            <div>
+              <strong>${session.username || 'Usuario Desconocido'}</strong>
+              <span class="badge badge-success">Activo</span>
+              <br>
+              <small style="color: #64748b;">
+                🖥️ ${session.station || 'Estación desconocida'} •
+                🕐 ${timeAgo}
+              </small>
+            </div>
+            <button onclick="cerrarSesion('${session.id}')" class="btn btn-danger" style="padding: 8px 16px;">
+              ❌ Cerrar Sesión
+            </button>
+          `;
+          container.appendChild(div);
+        });
+      } catch (error) {
+        console.error('Error cargando sesiones:', error);
+        container.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-state-icon">⚠️</div>
+            <div>Error al cargar sesiones activas</div>
+          </div>
+        `;
+      }
+    }
+
+    async function cerrarSesion(sessionId) {
+      if (!confirm('¿Estás seguro de cerrar esta sesión?\n\nEl usuario será desconectado inmediatamente.')) {
+        return;
+      }
+
+      try {
+        const result = await window.api?.invoke('security:close-session', sessionId);
+
+        if (result?.success) {
+          await cargarSesionesActivas();
+          alert('✅ Sesión cerrada exitosamente');
+        } else {
+          alert('❌ Error al cerrar sesión: ' + (result?.error || 'Desconocido'));
+        }
+      } catch (error) {
+        console.error('Error cerrando sesión:', error);
+        alert('❌ Error al cerrar sesión');
+      }
+    }
+
+    // ============================================
+    // IPS BLOQUEADAS
+    // ============================================
+    async function cargarIPsBloqueadas() {
+      const container = document.getElementById('blocked-ips');
+
+      try {
+        const result = await window.api?.invoke('security:get-blocked-ips');
+
+        if (!result?.success || !result.ips || result.ips.length === 0) {
+          container.innerHTML = `
+            <div class="empty-state">
+              <div class="empty-state-icon">🔓</div>
+              <div>No hay IPs bloqueadas actualmente</div>
+            </div>
+          `;
+          stats.blocked = 0;
+          actualizarEstadisticas();
+          return;
+        }
+
+        stats.blocked = result.ips.length;
+        actualizarEstadisticas();
+
+        container.innerHTML = '';
+        result.ips.forEach(ip => {
+          const div = document.createElement('div');
+          div.className = 'ip-item';
+
+          const timeAgo = calcularTiempoTranscurrido(ip.blockedAt);
+
+          div.innerHTML = `
+            <div>
+              <strong>🔒 ${ip.address}</strong>
+              <span class="badge badge-danger">Bloqueada</span>
+              <br>
+              <small style="color: #64748b;">
+                🕐 Bloqueada hace ${timeAgo} •
+                ⚠️ ${ip.attempts || 0} intentos fallidos
+              </small>
+            </div>
+            <button onclick="desbloquearIP('${ip.address}')" class="btn btn-primary" style="padding: 8px 16px;">
+              🔓 Desbloquear
+            </button>
+          `;
+          container.appendChild(div);
+        });
+      } catch (error) {
+        console.error('Error cargando IPs bloqueadas:', error);
+        container.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-state-icon">⚠️</div>
+            <div>Error al cargar IPs bloqueadas</div>
+          </div>
+        `;
+      }
+    }
+
+    async function desbloquearIP(ip) {
+      if (!confirm(`¿Desbloquear la IP ${ip}?\n\nEsta IP podrá volver a intentar acceder al sistema.`)) {
+        return;
+      }
+
+      try {
+        const result = await window.api?.invoke('security:unblock-ip', ip);
+
+        if (result?.success) {
+          await cargarIPsBloqueadas();
+          alert('✅ IP desbloqueada exitosamente');
+        } else {
+          alert('❌ Error al desbloquear IP: ' + (result?.error || 'Desconocido'));
+        }
+      } catch (error) {
+        console.error('Error desbloqueando IP:', error);
+        alert('❌ Error al desbloquear IP');
+      }
+    }
+
+    // ============================================
+    // GUARDAR CONFIGURACIÓN
+    // ============================================
+    async function guardarConfig() {
+      try {
+        const newConfig = {
+          password: {
+            minLength: parseInt(document.getElementById('pwd-min-length').value),
+            requireUppercase: document.getElementById('pwd-uppercase').checked,
+            requireNumbers: document.getElementById('pwd-numbers').checked,
+            requireSpecial: document.getElementById('pwd-special').checked,
+            expirationDays: parseInt(document.getElementById('pwd-expiration').value)
+          },
+          session: {
+            inactivityTimeout: parseInt(document.getElementById('session-timeout').value),
+            allowMultipleSessions: document.getElementById('session-multiple').checked,
+            logging: document.getElementById('session-logging').checked
+          },
+          login: {
+            maxAttempts: parseInt(document.getElementById('login-max-attempts').value),
+            lockoutMinutes: parseInt(document.getElementById('login-lockout').value),
+            notifyOnBlock: document.getElementById('login-notify').checked
+          },
+          backup: {
+            enabled: document.getElementById('backup-enabled').checked,
+            frequencyHours: parseInt(document.getElementById('backup-frequency').value),
+            keepCount: parseInt(document.getElementById('backup-keep').value),
+            encrypt: document.getElementById('backup-encrypt').checked
+          },
+          audit: {
+            level: document.getElementById('audit-level').value,
+            retentionDays: parseInt(document.getElementById('audit-retention').value),
+            criticalAlerts: document.getElementById('audit-alerts').checked
+          }
+        };
+
+        const result = await window.api?.invoke('security:save-config', newConfig);
+
+        if (result?.success) {
+          config = newConfig;
+          alert('✅ Configuración de seguridad guardada exitosamente');
+        } else {
+          alert('❌ Error al guardar configuración: ' + (result?.error || 'Desconocido'));
+        }
+      } catch (error) {
+        console.error('Error guardando configuración:', error);
+        alert('❌ Error al guardar configuración');
+      }
+    }
+
+    // ============================================
+    // BACKUP MANUAL
+    // ============================================
+    async function realizarBackupManual() {
+      if (!confirm('¿Realizar un backup completo ahora?\n\nEsto puede tomar unos segundos.')) {
+        return;
+      }
+
+      try {
+        const result = await window.api?.invoke('security:create-backup');
+
+        if (result?.success) {
+          alert(`✅ Backup creado exitosamente\n\nArchivo: ${result.filename || 'backup.db'}`);
+          await cargarEstadisticas();
+        } else {
+          alert('❌ Error al crear backup: ' + (result?.error || 'Desconocido'));
+        }
+      } catch (error) {
+        console.error('Error creando backup:', error);
+        alert('❌ Error al crear backup');
+      }
+    }
+
+    async function restaurarBackup() {
+      if (!confirm('⚠️ ADVERTENCIA: Restaurar desde backup\n\n' +
+                    'Esta acción sobrescribirá la base de datos actual.\n\n' +
+                    '¿Estás seguro de continuar?')) {
+        return;
+      }
+
+      try {
+        const result = await window.api?.invoke('security:restore-backup');
+
+        if (result?.success) {
+          alert('✅ Base de datos restaurada exitosamente\n\nLa aplicación se reiniciará.');
+          // Recargar la aplicación
+          window.location.reload();
+        } else {
+          alert('❌ Error al restaurar backup: ' + (result?.error || 'Desconocido'));
+        }
+      } catch (error) {
+        console.error('Error restaurando backup:', error);
+        alert('❌ Error al restaurar backup');
+      }
+    }
+
+    // ============================================
+    // UTILIDADES
+    // ============================================
+    function calcularTiempoTranscurrido(timestamp) {
+      const ahora = Date.now();
+      const fecha = new Date(timestamp).getTime();
+      const diferencia = ahora - fecha;
+
+      const minutos = Math.floor(diferencia / 60000);
+      const horas = Math.floor(diferencia / 3600000);
+      const dias = Math.floor(diferencia / 86400000);
+
+      if (dias > 0) return `${dias} día${dias > 1 ? 's' : ''}`;
+      if (horas > 0) return `${horas} hora${horas > 1 ? 's' : ''}`;
+      if (minutos > 0) return `${minutos} minuto${minutos > 1 ? 's' : ''}`;
+      return 'Hace un momento';
+    }
+
+    function volverConfig() {
+      window.api?.invoke('open-view', 'config');
+    }
+
+    // ============================================
+    // INICIALIZAR AL CARGAR
+    // ============================================
+    document.addEventListener('DOMContentLoaded', init);
+  </script>
+</body>
+</html>

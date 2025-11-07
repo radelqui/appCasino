@@ -10,6 +10,13 @@ class CasinoDatabase {
     const dir = path.dirname(this.dbPath);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     this.db = new Database(this.dbPath);
+
+    // ✅ FIX CRÍTICO: Evitar bloqueos cuando sync worker está activo
+    // WAL mode permite lecturas concurrentes durante escrituras
+    this.db.pragma('journal_mode = WAL');
+    // Esperar hasta 5 segundos si la DB está bloqueada
+    this.db.pragma('busy_timeout = 5000');
+
     this.initDatabase();
   }
 
@@ -23,7 +30,7 @@ class CasinoDatabase {
         currency TEXT CHECK(currency IN ('USD', 'DOP')) NOT NULL,
         mesa TEXT,
         estado TEXT CHECK(estado IN ('activo', 'emitido', 'usado', 'cancelado', 'expirado')) DEFAULT 'emitido',
-        fecha_emision DATETIME DEFAULT CURRENT_TIMESTAMP,
+        fecha_emision DATETIME DEFAULT (datetime('now', 'localtime')),
         fecha_cobro DATETIME,
         cajero_id TEXT,
         hash_seguridad TEXT,
@@ -320,7 +327,8 @@ class CasinoDatabase {
   }
 
   updateTicketStatus(code, estado, usuario_canje = null) {
-    const redeemed_at = estado === 'usado' ? new Date().toISOString() : null;
+    // ⚠️ FIX: Usar hora local en lugar de UTC
+    const redeemed_at = estado === 'usado' ? new Date().toLocaleString('sv-SE', { timeZone: 'America/Santo_Domingo' }).replace(' ', 'T') : null;
     return this.db.prepare('UPDATE tickets SET estado = ?, cajero_id = COALESCE(?, cajero_id), fecha_cobro = COALESCE(?, fecha_cobro) WHERE code = ?').run(String(estado), usuario_canje, redeemed_at, String(code).toUpperCase());
   }
 

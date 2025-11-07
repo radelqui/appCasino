@@ -1,0 +1,36 @@
+{
+  "timestamp": "2025-10-31T23:54:41.520Z",
+  "sqlite": {
+    "main": {
+      "error": "The module '\\\\?\\C:\\appCasino\\node_modules\\better-sqlite3\\build\\Release\\better_sqlite3.node'\nwas compiled against a different Node.js version using\nNODE_MODULE_VERSION 130. This version of Node.js requires\nNODE_MODULE_VERSION 115. Please try re-compiling or re-installing\nthe module (for instance, using `npm rebuild` or `npm install`)."
+    },
+    "caja": {
+      "error": "The module '\\\\?\\C:\\appCasino\\node_modules\\better-sqlite3\\build\\Release\\better_sqlite3.node'\nwas compiled against a different Node.js version using\nNODE_MODULE_VERSION 130. This version of Node.js requires\nNODE_MODULE_VERSION 115. Please try re-compiling or re-installing\nthe module (for instance, using `npm rebuild` or `npm install`)."
+    }
+  },
+  "supabase": {
+    "vouchers": {
+      "total": 40,
+      "active": 20,
+      "redeemed": 20
+    },
+    "users": {
+      "total": 9
+    },
+    "operadores": {
+      "total": 3
+    },
+    "stations": {
+      "total": 5
+    }
+  },
+  "pending": {
+    "tickets": [],
+    "users": [],
+    "operadores": []
+  },
+  "issues": [
+    "SQLite principal: The module '\\\\?\\C:\\appCasino\\node_modules\\better-sqlite3\\build\\Release\\better_sqlite3.node'\nwas compiled against a different Node.js version using\nNODE_MODULE_VERSION 130. This version of Node.js requires\nNODE_MODULE_VERSION 115. Please try re-compiling or re-installing\nthe module (for instance, using `npm rebuild` or `npm install`)."
+  ],
+  "recommendations": []
+}

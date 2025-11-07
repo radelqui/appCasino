@@ -51,6 +51,15 @@
           </select>
         </div>
       </div>
+
+      <!-- Valores Rápidos -->
+      <div style="margin-top:16px">
+        <div style="font-size:14px;color:#9ca3af;margin-bottom:8px">⚡ Valores Rápidos:</div>
+        <div id="valores-rapidos" style="display:flex;gap:8px;flex-wrap:wrap">
+          <!-- Botones se cargan dinámicamente -->
+        </div>
+      </div>
+
       <div style="margin-top:12px">
         <button class="button" id="emitir">Emitir voucher</button>
         <span id="status" class="status"></span>
@@ -61,6 +70,17 @@
       <h2>Vista previa del ticket</h2>
       <div style="margin-top:12px">
         <iframe id="preview-ticket" width="420" height="640"></iframe>
+      </div>
+    </section>
+
+    <!-- Panel de Últimos Tickets Emitidos -->
+    <section class="card" id="recent-tickets-section">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <h2>📋 Últimos Tickets Emitidos Hoy</h2>
+        <button class="button" id="refresh-tickets" style="padding:6px 12px;font-size:12px">🔄 Actualizar</button>
+      </div>
+      <div id="recent-tickets-list" style="margin-top:12px;max-height:400px;overflow-y:auto">
+        <p style="color:#64748b;text-align:center">Cargando...</p>
       </div>
     </section>
 
@@ -106,9 +126,14 @@
     const statusEl = document.getElementById('status');
     function msg(text, ok=true){ statusEl.textContent = text; statusEl.style.color = ok? '#10b981' : '#ef4444'; }
 
-    // Navegación: solo Salir (Inicio y Salir hacían lo mismo)
+    // Navegación: Salir (volver al panel)
     document.getElementById('btnSalir').addEventListener('click', async () => {
-      try { await window.api?.closeCurrent?.(); } catch (_) { try { window.close(); } catch {} }
+      try {
+        await window.api?.backToPanel?.();
+      } catch (e) {
+        console.warn('backToPanel no disponible, intentando closeCurrent');
+        try { await window.api?.closeCurrent?.(); } catch (_) { try { window.close(); } catch {} }
+      }
     });
 
     // Emisión y prueba
@@ -157,9 +182,42 @@
         const valorShow = typeof result?.ticket?.amount === 'number' ? result.ticket.amount : (result?.valor ?? valor);
         msg(`Emitido ticket ${code} (${monedaShow} ${Number(valorShow).toFixed(2)})`);
 
-        // 3. ACTUALIZAR vista previa con el código del voucher emitido
-        console.log('🔄 Actualizando vista previa con código:', code);
-        await actualizarVistaPrevia(code);
+        // 3. GUARDAR datos del ticket para la vista previa
+        const ticketEmitido = {
+          valor: valorShow,
+          moneda: monedaShow,
+          mesa_nombre: mesaNombre,
+          operador_nombre: operadorNombre,
+          ticket_number: code
+        };
+
+        // Actualizar vista previa con datos del ticket emitido
+        console.log('🔄 Actualizando vista previa con ticket emitido:', ticketEmitido);
+        await vistaPrevia(code); // Pasar el código para generar vista previa correcta
+
+        // 4. RESET del formulario para nuevo ticket (FIRMA DIGITAL)
+        // ⚠️ Esperar 1500ms para asegurar que la vista previa se cargue completamente
+        setTimeout(() => {
+          try {
+            // Vaciar valor
+            const valorInput = document.getElementById('valor');
+            if (valorInput) valorInput.value = '';
+
+            // Resetear operador (FIRMA DIGITAL - debe elegir cada vez)
+            const usuarioSelect = document.getElementById('usuario');
+            if (usuarioSelect) usuarioSelect.value = '';
+
+            // NO resetear mesa ni moneda - mantener contexto
+
+            // ✅ FIX: NO actualizar vista previa después del reset
+            // La vista previa debe quedarse mostrando el ticket emitido
+            // actualizarVistaPrevia(); ← ELIMINADO
+
+            console.log('✅ Formulario reseteado para nuevo ticket');
+          } catch (resetError) {
+            console.warn('⚠️ Error reseteando formulario:', resetError);
+          }
+        }, 1500); // 1.5 segundos para dar tiempo a la vista previa
 
       } catch(e) {
         console.error(e); msg(`Error: ${e.message}`, false);
@@ -191,12 +249,13 @@
         else msg('Perfil actualizado localmente');
       } catch(e) { msg(`Error guardando perfil: ${e.message}`, false); }
     }
-    async function vistaPrevia(voucherCode = null){
+    async function vistaPrevia(voucherCode = null, datosTicket = null){
       try {
-        const valor = parseFloat(document.getElementById('valor').value || '0');
-        const moneda = document.getElementById('moneda').value || 'DOP';
-        const mesa_id = document.getElementById('mesa').value || 'P01';
-        const usuario_emision = document.getElementById('usuario').value || 'VistaPrevia';
+        // Si se pasan datos del ticket, usarlos; sino, leer del formulario
+        const valor = datosTicket?.valor || parseFloat(document.getElementById('valor').value || '0');
+        const moneda = datosTicket?.moneda || document.getElementById('moneda').value || 'DOP';
+        const mesa_id = datosTicket?.mesa_nombre || document.getElementById('mesa').value || 'P01';
+        const usuario_emision = datosTicket?.operador_nombre || document.getElementById('usuario').value || 'VistaPrevia';
 
         const payload = {
           valor,
@@ -346,6 +405,84 @@
       }
     })();
 
+    // Función para establecer valor rápido
+    function setValorRapido(valor) {
+      const valorInput = document.getElementById('valor');
+      if (valorInput) {
+        valorInput.value = valor;
+        console.log(`⚡ Valor rápido establecido: ${valor}`);
+
+        // ⚠️ FIX: Actualizar vista previa de forma asíncrona para no bloquear UI
+        setTimeout(() => {
+          actualizarVistaPrevia().catch(err => {
+            console.warn('⚠️ Error actualizando vista previa:', err.message);
+          });
+        }, 0);
+      }
+    }
+
+    // Cargar valores rápidos desde configuración
+    async function cargarValoresRapidos() {
+      try {
+        const result = await window.api?.invoke?.('currency:get-config');
+        if (result?.success && result?.config) {
+          const moneda = document.getElementById('moneda').value || 'DOP';
+          const config = result.config[moneda];
+
+          if (config && config.presets && Array.isArray(config.presets)) {
+            const container = document.getElementById('valores-rapidos');
+            if (container) {
+              container.innerHTML = '';
+              config.presets.forEach(valor => {
+                const btn = document.createElement('button');
+                btn.className = 'button';
+                btn.style.cssText = 'padding:6px 12px;font-size:13px;background:#3b82f6;border-color:#3b82f6;';
+                btn.textContent = `${moneda === 'USD' ? '$' : 'RD$'}${Number(valor).toLocaleString()}`;
+                btn.onclick = () => setValorRapido(valor);
+                container.appendChild(btn);
+              });
+              console.log(`✅ Valores rápidos cargados: ${config.presets.length} opciones`);
+            }
+          }
+        } else {
+          // Valores por defecto si no hay configuración
+          cargarValoresPorDefecto();
+        }
+      } catch (error) {
+        console.warn('⚠️ Error cargando valores rápidos:', error);
+        cargarValoresPorDefecto();
+      }
+    }
+
+    // Valores por defecto si no hay configuración
+    function cargarValoresPorDefecto() {
+      const moneda = document.getElementById('moneda').value || 'DOP';
+      const presets = moneda === 'USD'
+        ? [20, 50, 100, 200, 500, 1000]
+        : [100, 500, 1000, 2000, 5000, 10000];
+
+      const container = document.getElementById('valores-rapidos');
+      if (container) {
+        container.innerHTML = '';
+        presets.forEach(valor => {
+          const btn = document.createElement('button');
+          btn.className = 'button';
+          btn.style.cssText = 'padding:6px 12px;font-size:13px;background:#3b82f6;border-color:#3b82f6;';
+          btn.textContent = `${moneda === 'USD' ? '$' : 'RD$'}${Number(valor).toLocaleString()}`;
+          btn.onclick = () => setValorRapido(valor);
+          container.appendChild(btn);
+        });
+      }
+    }
+
+    // Recargar valores rápidos al cambiar moneda
+    document.getElementById('moneda').addEventListener('change', () => {
+      cargarValoresRapidos();
+    });
+
+    // Cargar valores rápidos al inicio
+    cargarValoresRapidos();
+
     // Sistema de salud anti-cuelgues: cargar indicador visual
     (async function cargarIndicadorSalud() {
       try {
@@ -362,6 +499,82 @@
         console.warn('❌ No se pudo cargar indicador de salud:', e.message);
       }
     })();
+
+    // ============================================
+    // PANEL DE ÚLTIMOS TICKETS RECIENTES
+    // ============================================
+    async function loadRecentTickets() {
+      const listEl = document.getElementById('recent-tickets-list');
+      if (!listEl) return;
+
+      try {
+        listEl.innerHTML = '<p style="color:#64748b;text-align:center">Cargando...</p>';
+
+        const result = await window.api.getRecentTickets(20);
+
+        if (!result.success || !result.tickets || result.tickets.length === 0) {
+          listEl.innerHTML = '<p style="color:#64748b;text-align:center">No hay tickets emitidos hoy</p>';
+          return;
+        }
+
+        // Renderizar tickets
+        listEl.innerHTML = result.tickets.map(t => `
+          <div style="padding:12px;border:1px solid #1f2740;border-radius:8px;margin-bottom:8px;background:#0f1731;transition:background 0.2s">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+              <strong style="color:#2e7de9;font-size:14px">${t.code}</strong>
+              <span style="
+                font-size:12px;
+                padding:4px 8px;
+                border-radius:4px;
+                background:${t.estado === 'Cobrado' ? '#7bc37933' : t.estado === 'Pendiente' ? '#e3b34133' : '#e35d5d33'};
+                color:${t.estado === 'Cobrado' ? '#7bc379' : t.estado === 'Pendiente' ? '#e3b341' : '#e35d5d'}
+              ">${t.estado}</span>
+            </div>
+            <div style="font-size:13px;color:#a9b3c7;margin-bottom:4px">
+              🎰 ${t.mesa} · 👤 ${t.operador}
+            </div>
+            <div style="font-size:18px;font-weight:600;color:#ffffff">
+              ${t.currency} ${Number(t.amount).toFixed(2)}
+            </div>
+            <div style="font-size:11px;color:#64748b;margin-top:4px">
+              ${new Date(t.fecha).toLocaleTimeString('es-DO', { hour: '2-digit', minute: '2-digit' })}
+            </div>
+          </div>
+        `).join('');
+
+        console.log(`✅ ${result.tickets.length} tickets recientes cargados`);
+      } catch (error) {
+        console.error('Error cargando tickets recientes:', error);
+        listEl.innerHTML = '<p style="color:#ef4444;text-align:center">❌ Error cargando tickets</p>';
+      }
+    }
+
+    // Cargar tickets al iniciar
+    loadRecentTickets();
+
+    // Botón refrescar
+    const refreshBtn = document.getElementById('refresh-tickets');
+    if (refreshBtn) {
+      refreshBtn.addEventListener('click', () => {
+        console.log('🔄 Refrescando tickets...');
+        loadRecentTickets();
+      });
+    }
+
+    // Auto-refrescar después de emitir ticket
+    // Envolver la función emitir original para agregar hook
+    const originalEmitir = window.emitir;
+    if (originalEmitir) {
+      window.emitir = async function(...args) {
+        const result = await originalEmitir.apply(this, args);
+        // Refrescar panel después de 1 segundo
+        setTimeout(() => {
+          console.log('🔄 Auto-refrescando panel de tickets...');
+          loadRecentTickets();
+        }, 1000);
+        return result;
+      };
+    }
   </script>
 </body>
 </html>

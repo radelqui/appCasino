@@ -1,0 +1,2261 @@
+const { app, BrowserWindow, ipcMain } = require('electron');
+const path = require('path');
+const fs = require('fs');
+require('dotenv').config();
+const crypto = require('crypto');
+// Reutilizamos el preload existente para exponer window.api (definir temprano)
+const preloadPath = path.join(__dirname, '..', 'src', 'main', 'preload.js');
+// Flags de logging
+const VERBOSE = process.env.CASINO_VERBOSE === '1';
+const LOG_SCHEMA = process.env.CASINO_LOG_SCHEMA === '1';
+// Supabase Manager para sincronización cloud
+const { getSupabaseManager } = require(path.join(__dirname, 'supabaseManager'));
+let supabaseManager = null; // Se inicializa después de app.whenReady()
+// Health Monitor para detectar cuelgues
+const { getHealthMonitor } = require(path.join(__dirname, 'healthMonitor'));
+const { SafeDatabaseOperations, SafeSupabaseOperations } = require(path.join(__dirname, 'safeOperations'));
+let healthMonitor = null;
+let safeDb = null;
+let safeSupabase = null;
+
+// Mitigar problemas de GPU en algunos equipos/VMs
+if (app) {
+  try {
+    app.disableHardwareAcceleration();
+    app.commandLine.appendSwitch('disable-gpu');
+    app.commandLine.appendSwitch('disable-gpu-compositing');
+  } catch (e) {
+    console.warn('No se pudieron aplicar configuraciones de GPU:', e?.message);
+  }
+}
+
+// ============================================
+// Base de datos unificada (misma ruta que Caja)
+// ============================================
+let db; // instancia de CasinoDatabase
+try {
+  const CasinoDatabase = require(path.join(__dirname, '..', 'Caja', 'database'));
+  const dbPath = process.env.CASINO_DB_PATH || process.env.SQLITE_DB_PATH || path.join(process.cwd(), 'data', 'casino.db');
+  db = new CasinoDatabase(dbPath);
+  // Asegurar columnas adicionales para Mesa/Operador en tickets
+  try {
+    const cols = db.db.prepare("PRAGMA table_info('tickets')").all().map(c => c.name);
+    const toAdd = [];
+    if (!cols.includes('mesa_nombre')) toAdd.push("ALTER TABLE tickets ADD COLUMN mesa_nombre TEXT");
+    if (!cols.includes('mesa_id')) toAdd.push("ALTER TABLE tickets ADD COLUMN mesa_id INTEGER");
+    if (!cols.includes('created_by_user_id')) toAdd.push("ALTER TABLE tickets ADD COLUMN created_by_user_id INTEGER");
+    if (!cols.includes('created_by_username')) toAdd.push("ALTER TABLE tickets ADD COLUMN created_by_username TEXT");
+    for (const sql of toAdd) { try { db.db.exec(sql); } catch {} }
+  } catch (e) {
+    if (VERBOSE) console.warn('No se pudieron asegurar columnas extra en tickets:', e?.message);
+  }
+  // Diagnóstico silenciable: esquema de BD
+  if (LOG_SCHEMA) {
+    try {
+      const tables = db.db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all();
+      console.log('📦 Tablas en SQLite:', tables.map(t => t.name).join(', '));
+      for (const t of tables) {
+        if (!t?.name) continue;
+        const info = db.db.prepare(`PRAGMA table_info(${t.name})`).all();
+        console.log(`🧩 PRAGMA table_info(${t.name}):`, info.map(c => `${c.name}:${c.type}`).join(', '));
+      }
+    } catch (e) {
+      if (VERBOSE) console.warn('No se pudo imprimir esquema de BD:', e?.message);
+    }
+  }
+} catch (e) {
+  console.warn('No se pudo inicializar la base de datos para auth/stats:', e.message);
+}
+
+// ============================================
+// SESIÓN GLOBAL
+// ============================================
+let currentSession = null;
+let mainWindow = null;
+// Modo de una sola ventana: no se mantiene registro de ventanas hijas
+
+// (Eliminado doResetPins temporal; login ya validado)
+
+// ============================================
+// HANDLER: auth:login (Supabase Auth)
+// ============================================
+try {
+  ipcMain.handle('auth:login', async (_event, { username, password }) => {
+    try {
+      console.log('🔐 Intentando login:', username);
+
+      if (!supabaseManager || !supabaseManager.isAvailable()) {
+        console.log('❌ Supabase no disponible');
+        return { success: false, error: 'Sistema de autenticación no disponible' };
+      }
+
+      // Login con Supabase Auth usando cliente ANON
+      const authClient = supabaseManager.anonClient || supabaseManager.client;
+      const { data, error } = await authClient.auth.signInWithPassword({
+        email: username,
+        password: password
+      });
+
+      if (error) {
+        console.log('❌ Error de login:', error.message);
+        return { success: false, error: 'Email o contraseña incorrectos' };
+      }
+
+      console.log('✅ Auth exitoso, obteniendo perfil...');
+
+      // Obtener perfil del usuario (usando SERVICE_ROLE que ya tiene supabaseManager)
+      const { data: profile, error: profileError } = await supabaseManager.client
+        .from('users')
+        .select('*')
+        .eq('id', data.user.id)
+        .maybeSingle(); // ✅ Cambiado de .single() a .maybeSingle() para evitar error si no existe
+
+      console.log('Perfil obtenido:', { profile, profileError: profileError?.message });
+
+      if (profileError) {
+        console.log('❌ Error obteniendo perfil:', profileError.message);
+        return { success: false, error: 'Error obteniendo perfil de usuario' };
+      }
+
+      if (!profile) {
+        console.log('❌ Perfil no encontrado');
+        return { success: false, error: 'Usuario sin perfil configurado' };
+      }
+
+      if (!profile.is_active) {
+        console.log('❌ Usuario inactivo');
+        return { success: false, error: 'Usuario inactivo' };
+      }
+
+      // Guardar sesión
+      currentSession = {
+        user: {
+          id: profile.id,
+          email: profile.email,
+          username: profile.full_name,
+          role: profile.role.toUpperCase()
+        }
+      };
+
+      console.log('✅ Login exitoso:', currentSession.user);
+
+      return {
+        success: true,
+        user: currentSession.user
+      };
+
+    } catch (error) {
+      console.error('❌ Error en login:', error);
+      return { success: false, error: error.message };
+    }
+  });
+  // (Eliminado handler admin:reset-pins temporal)
+
+  // ============================================
+  // HANDLER: auth:get-session
+  // ============================================
+  ipcMain.handle('auth:get-session', async () => currentSession);
+
+  // ============================================
+  // HANDLER: get-role / set-role
+  // ============================================
+  ipcMain.handle('get-role', async () => currentSession?.user?.role || null);
+  ipcMain.handle('set-role', async (_event, role) => {
+    if (currentSession?.user) currentSession.user.role = String(role).toUpperCase();
+    return currentSession?.user?.role || null;
+  });
+
+  // ============================================
+  // HANDLER: auth:logout
+  // ============================================
+ipcMain.handle('auth:logout', async () => {
+  currentSession = null;
+  return { success: true };
+});
+
+// Abre una nueva ventana para una vista específica (mesa/caja/auditoria)
+// Eliminado: creación de nuevas ventanas por vista. Se carga el contenido en la ventana actual.
+
+// Handler para abrir vistas desde el panel (abre ventanas como antes)
+ipcMain.handle('open-view', async (event, viewName) => {
+  try {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (!win) return { success: false, error: 'Window not found' };
+
+    let normalized = String(viewName || '').toLowerCase();
+    if (!normalized) return { success: false, error: 'Parámetro viewName inválido' };
+    if (normalized === 'auditoria') normalized = 'auditor';
+
+    let filePath;
+    switch (normalized) {
+      case 'panel':
+        filePath = path.join(__dirname, '..', 'Caja', 'panel.html');
+        break;
+      case 'mesa':
+        // Usar archivo existente en pure
+        filePath = path.join(__dirname, 'mesa.html');
+        break;
+      case 'caja':
+        // Usar vista de Caja original
+        filePath = path.join(__dirname, '..', 'Caja', 'caja.html');
+        break;
+      case 'auditor':
+        // Vista auditor existente en pure
+        filePath = path.join(__dirname, 'auditor.html');
+        break;
+      case 'config':
+        // Vista de configuración
+        filePath = path.join(__dirname, 'config.html');
+        break;
+      case 'operadores':
+        // Vista de gestión de operadores
+        filePath = path.join(__dirname, 'operadores.html');
+        break;
+      case 'usuarios':
+        // Vista de gestión de usuarios
+        filePath = path.join(__dirname, 'usuarios.html');
+        break;
+      case 'impresoras':
+        // Vista de configuración de impresoras
+        filePath = path.join(__dirname, 'impresoras.html');
+        break;
+      case 'monedas':
+        // Vista de configuración de monedas
+        filePath = path.join(__dirname, 'monedas.html');
+        break;
+      case 'seguridad':
+        // Vista de configuración de seguridad
+        filePath = path.join(__dirname, 'seguridad.html');
+        break;
+      case 'database':
+        // Vista de configuración de base de datos
+        filePath = path.join(__dirname, 'database.html');
+        break;
+      case 'logs':
+        // Vista de logs del sistema
+        filePath = path.join(__dirname, 'logs.html');
+        break;
+      case 'reportes':
+        // Vista de reportes
+        filePath = path.join(__dirname, 'reportes.html');
+        break;
+      case 'sync-utility':
+        // Vista de utilidad de sincronización
+        filePath = path.join(__dirname, 'sync-utility.html');
+        break;
+      default:
+        return { success: false, error: 'Vista desconocida' };
+    }
+
+    await win.loadFile(filePath);
+    if (VERBOSE) console.log(`✅ Vista ${normalized} cargada en ventana actual: ${filePath}`);
+    return { success: true, view: normalized };
+  } catch (error) {
+    console.error('❌ Error en open-view:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('back-to-panel', async (event) => {
+  try {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (!win) return { success: false };
+    const panelPath = path.join(__dirname, '..', 'Caja', 'panel.html');
+    await win.loadFile(panelPath);
+    if (VERBOSE) console.log('↩️  Volver al panel en la misma ventana');
+    return { success: true };
+  } catch (e) {
+    console.error('❌ Error en back-to-panel:', e);
+    return { success: false, error: e?.message };
+  }
+});
+
+// Compat: enfoque del panel (no-ops seguros en modelo de ventana única)
+ipcMain.handle('focus-panel', async (event) => {
+  try {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (win) { try { win.show(); win.focus(); } catch {} }
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e?.message };
+  }
+});
+
+// Compat: cerrar ventana actual (no cerrar en modo de una sola ventana)
+ipcMain.handle('close-current', async () => {
+  // No hacemos nada para evitar cerrar la única ventana
+  return { success: true };
+});
+
+// Salir de la app
+ipcMain.handle('exit-app', async () => {
+  try {
+    console.log('🚪 Cerrando aplicación');
+    app.quit();
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e?.message };
+  }
+});
+
+  // ============================================
+  // HANDLER: get-stats-today (usando tickets)
+  // ============================================
+  ipcMain.handle('get-stats-today', async () => {
+    try {
+      if (!db) throw new Error('DB no disponible');
+      const s = db.getStatsToday() || { ticketsHoy: 0, totalDOP: 0, totalUSD: 0, pendientes: 0 };
+      // Devolver alias para compatibilidad con distintas vistas (panel/caja)
+      return {
+        ...s,
+        ticketsToday: s.ticketsHoy ?? 0,
+        pending: s.pendientes ?? 0,
+      };
+    } catch (error) {
+      console.error('Error get-stats-today:', error?.message);
+      return { ticketsHoy: 0, totalDOP: 0, totalUSD: 0, pendientes: 0, ticketsToday: 0, pending: 0 };
+    }
+  });
+
+  // ============================================
+  // HANDLERS BÁSICOS: generación/validación/canje/estadísticas
+  // (Compatibilidad inmediata con el Panel)
+  // ============================================
+
+  // ============================================
+  // HANDLERS: Configuración de Impresoras
+  // ============================================
+
+  safeIpcHandle('printer:detect', async () => {
+    try {
+      const { getPrinters } = require('pdf-to-printer');
+      const printers = await getPrinters();
+
+      return {
+        success: true,
+        printers: printers.map(p => ({
+          name: p.name,
+          description: p.description || '',
+          isDefault: p.isDefault || false
+        }))
+      };
+    } catch (error) {
+      console.error('❌ Error detectando impresoras:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  // Guardar configuración de impresora
+  safeIpcHandle('printer:save-config', async (event, config) => {
+    try {
+      const configPath = path.join(app.getPath('userData'), 'printer-config.json');
+
+      let allConfigs = {};
+      if (fs.existsSync(configPath)) {
+        allConfigs = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+      }
+
+      allConfigs[config.name] = {
+        type: config.type,
+        width: config.width,
+        isDefault: config.isDefault
+      };
+
+      // Si es predeterminada, desmarcar las demás
+      if (config.isDefault) {
+        Object.keys(allConfigs).forEach(key => {
+          if (key !== config.name) {
+            allConfigs[key].isDefault = false;
+          }
+        });
+      }
+
+      fs.writeFileSync(configPath, JSON.stringify(allConfigs, null, 2));
+
+      console.log('✅ Configuración de impresora guardada:', config.name);
+      return { success: true };
+    } catch (error) {
+      console.error('❌ Error guardando config de impresora:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  // Obtener configuración de impresora
+  safeIpcHandle('printer:get-config', async (event, printerName) => {
+    try {
+      const configPath = path.join(app.getPath('userData'), 'printer-config.json');
+
+      if (!fs.existsSync(configPath)) {
+        return { success: true, type: 'thermal', width: 80, isDefault: false };
+      }
+
+      const allConfigs = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+      const config = allConfigs[printerName] || { type: 'thermal', width: 80, isDefault: false };
+
+      return { success: true, ...config };
+    } catch (error) {
+      console.error('❌ Error obteniendo config de impresora:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  // Establecer impresora predeterminada
+  safeIpcHandle('printer:set-default', async (event, printerName) => {
+    try {
+      const configPath = path.join(app.getPath('userData'), 'printer-config.json');
+
+      let allConfigs = {};
+      if (fs.existsSync(configPath)) {
+        allConfigs = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+      }
+
+      // Desmarcar todas
+      Object.keys(allConfigs).forEach(key => {
+        allConfigs[key].isDefault = (key === printerName);
+      });
+
+      // Si no existe, crear con defaults
+      if (!allConfigs[printerName]) {
+        allConfigs[printerName] = { type: 'thermal', width: 80, isDefault: true };
+      } else {
+        allConfigs[printerName].isDefault = true;
+      }
+
+      fs.writeFileSync(configPath, JSON.stringify(allConfigs, null, 2));
+
+      console.log('✅ Impresora predeterminada:', printerName);
+      return { success: true };
+    } catch (error) {
+      console.error('❌ Error estableciendo impresora predeterminada:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  // Prueba de impresión
+  safeIpcHandle('printer:test-print', async () => {
+    try {
+      const configPath = path.join(app.getPath('userData'), 'printer-config.json');
+      let printerName = null;
+
+      // Obtener impresora predeterminada
+      if (fs.existsSync(configPath)) {
+        const allConfigs = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+        const defaultPrinter = Object.entries(allConfigs).find(([name, config]) => config.isDefault);
+        if (defaultPrinter) {
+          printerName = defaultPrinter[0];
+        }
+      }
+
+      // Generar ticket de prueba
+      const testTicket = {
+        ticket_number: 'TEST-' + Date.now(),
+        valor: 100,
+        moneda: 'USD',
+        fecha_emision: new Date().toISOString(),
+        qr_code: JSON.stringify({
+          code: 'TEST-' + Date.now(),
+          amount: 100,
+          currency: 'USD',
+          mesa: 'PRUEBA',
+          timestamp: Date.now(),
+          hash: '00000000'
+        }),
+        mesa_id: 'PRUEBA',
+        usuario_emision: 'PRUEBA',
+        operador_nombre: 'SISTEMA'
+      };
+
+      const pdfBuffer = await TicketService.generateTicket(testTicket);
+
+      // Imprimir
+      const { print } = require('pdf-to-printer');
+      const tempPath = path.join(app.getPath('temp'), 'test-ticket.pdf');
+      fs.writeFileSync(tempPath, pdfBuffer);
+
+      await print(tempPath, printerName ? { printer: printerName } : undefined);
+
+      // Limpiar archivo temporal
+      try { fs.unlinkSync(tempPath); } catch {}
+
+      console.log('✅ Ticket de prueba impreso:', printerName || 'impresora predeterminada del sistema');
+      return { success: true };
+    } catch (error) {
+      console.error('❌ Error en prueba de impresión:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  // ============================================
+  // HANDLERS: Configuración de Monedas y Valores
+  // ============================================
+
+  // Obtener configuración de monedas
+  safeIpcHandle('currency:get-config', async () => {
+    try {
+      const configPath = path.join(app.getPath('userData'), 'currency-config.json');
+
+      if (!fs.existsSync(configPath)) {
+        // Configuración por defecto
+        return {
+          success: true,
+          config: {
+            USD: {
+              enabled: true,
+              min: 5,
+              max: 10000,
+              decimals: 2,
+              presets: [20, 50, 100, 200, 500, 1000]
+            },
+            DOP: {
+              enabled: true,
+              min: 50,
+              max: 500000,
+              decimals: 2,
+              presets: [100, 500, 1000, 2000, 5000, 10000]
+            },
+            exchangeRate: 58.50,
+            lastUpdated: new Date().toISOString()
+          }
+        };
+      }
+
+      const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+      return { success: true, config };
+    } catch (error) {
+      console.error('❌ Error obteniendo configuración de monedas:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  // Guardar configuración de monedas
+  safeIpcHandle('currency:save-config', async (event, config) => {
+    try {
+      const configPath = path.join(app.getPath('userData'), 'currency-config.json');
+
+      // Validación básica
+      if (!config || typeof config !== 'object') {
+        throw new Error('Configuración inválida');
+      }
+
+      // Validar que al menos una moneda esté habilitada
+      if (!config.USD?.enabled && !config.DOP?.enabled) {
+        throw new Error('Debe haber al menos una moneda activa');
+      }
+
+      // Guardar con timestamp
+      config.lastUpdated = new Date().toISOString();
+
+      fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+
+      console.log('✅ Configuración de monedas guardada');
+      return { success: true };
+    } catch (error) {
+      console.error('❌ Error guardando configuración de monedas:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('generate-ticket', async (_event, ticketData = {}) => {
+    try {
+      if (!db) throw new Error('DB no disponible');
+      console.log('📥 Recibiendo datos para crear ticket:', ticketData);
+      const amount = Number(ticketData.valor ?? ticketData.amount);
+      const currency = String(ticketData.moneda ?? ticketData.currency ?? 'DOP').toUpperCase();
+      const mesa = ticketData.mesa_id ?? ticketData.mesa ?? (ticketData.mesa_nombre || 'M01');
+      if (!amount || amount <= 0) throw new Error('El valor debe ser mayor que cero');
+      if (!['DOP','USD'].includes(currency)) throw new Error('Moneda inválida');
+
+      // 1. CREAR TICKET EN SQLITE LOCAL (para generar código)
+      const res = db.createTicket({ amount, currency, mesa, usuario_emision: ticketData.usuario_emision || null });
+      const ticketCode = res.ticket_number;
+
+      // Enriquecer con mesa_id y datos del operador si hay sesión
+      let userId = null;
+      let stationId = null;
+      try {
+        const user = (typeof currentSession === 'object' && currentSession && currentSession.user) ? currentSession.user : null;
+        const mesaId = ticketData.mesa_id || null;
+        const createdByUserId = user?.id || null;
+        const createdByUsername = ticketData.operador_nombre || ticketData.created_by_username || user?.email || user?.name || null;
+        const mesaNombre = ticketData.mesa_nombre || null;
+        db.db.prepare(
+          'UPDATE tickets SET mesa_id = COALESCE(?, mesa_id), created_by_user_id = COALESCE(?, created_by_user_id), created_by_username = COALESCE(?, created_by_username), mesa_nombre = COALESCE(?, mesa_nombre) WHERE code = ?'
+        ).run(mesaId, createdByUserId, createdByUsername, mesaNombre, ticketCode);
+
+        userId = createdByUserId;
+        stationId = mesaId;
+      } catch (e) {
+        if (VERBOSE) console.warn('No se pudo actualizar mesa/operador en ticket:', e?.message);
+      }
+
+      console.log('✅ Ticket guardado en SQLite local:', ticketCode);
+
+      // 2. INTENTAR GUARDAR EN SUPABASE (cloud)
+      let syncedToCloud = false;
+      if (supabaseManager && supabaseManager.isAvailable()) {
+        try {
+          console.log('☁️  Intentando sincronizar con Supabase...');
+
+          const supabaseResult = await supabaseManager.createVoucher({
+            voucher_code: ticketCode,
+            amount,
+            currency,
+            issued_by_user_id: userId || process.env.DEFAULT_USER_ID || '85397c30-3856-4d82-a4bb-06791b8cacd0',
+            issued_at_station_id: stationId || 1,
+            customer_name: ticketData.operador_nombre || null
+          });
+
+          if (supabaseResult.success) {
+            syncedToCloud = true;
+            // Marcar como sincronizado en SQLite
+            try {
+              db.db.prepare('UPDATE tickets SET sincronizado = 1 WHERE code = ?').run(ticketCode);
+              console.log('✅ Ticket sincronizado con Supabase:', ticketCode);
+            } catch (e) {
+              if (VERBOSE) console.warn('No se pudo marcar como sincronizado:', e?.message);
+            }
+          } else {
+            console.warn('⚠️  No se pudo sincronizar con Supabase:', supabaseResult.error);
+          }
+        } catch (supaError) {
+          console.warn('⚠️  Error sincronizando con Supabase (modo offline):', supaError.message);
+        }
+      } else {
+        console.warn('⚠️  Supabase no disponible, funcionando en modo offline');
+      }
+
+      // 3. RETORNAR RESULTADO
+      console.log('✅ Ticket guardado:', {
+        code: ticketCode,
+        amount,
+        currency,
+        mesa: ticketData.mesa_nombre || mesa,
+        operador: ticketData.operador_nombre || null,
+        synced: syncedToCloud
+      });
+
+      return {
+        success: true,
+        ticket: {
+          id: res.id || null,
+          code: ticketCode,
+          amount,
+          currency,
+          mesa: ticketData.mesa_nombre || mesa,
+          operador: ticketData.operador_nombre || null
+        },
+        synced: syncedToCloud
+      };
+    } catch (e) {
+      console.error('[generate-ticket] Error:', e?.message);
+      return { success: false, error: e?.message || String(e) };
+    }
+  });
+
+  ipcMain.handle('validate-voucher', async (_event, voucherCode) => {
+    try {
+      if (!db) throw new Error('DB no disponible');
+      const code = String(voucherCode || '').toUpperCase().trim();
+      if (!code) throw new Error('Código requerido');
+
+      let rowData = null;
+      let mesaNombre = 'N/A';
+      let operadorNombre = null;
+      let source = 'local';
+
+      // 1. BUSCAR EN SUPABASE PRIMERO (fuente de verdad si está disponible)
+      if (supabaseManager && supabaseManager.isAvailable()) {
+        try {
+          console.log('☁️  Buscando voucher en Supabase:', code);
+          const supabaseResult = await supabaseManager.getVoucher(code);
+
+          if (supabaseResult.success && supabaseResult.data) {
+            const supa = supabaseResult.data;
+            source = 'cloud';
+
+            // Mapear estructura de Supabase a formato esperado
+            rowData = {
+              code: supa.voucher_code,
+              amount: supa.amount,
+              currency: supa.currency,
+              estado: supa.status === 'active' ? 'emitido' : (supa.status === 'redeemed' ? 'usado' : supa.status),
+              created_at: supa.issued_at,
+              fecha_emision: supa.issued_at,
+              mesa_nombre: supa.issued_at_station_id ? `MESA-${supa.issued_at_station_id}` : 'N/A',
+              created_by_username: supa.customer_name || 'N/A'
+            };
+
+            mesaNombre = rowData.mesa_nombre;
+            operadorNombre = rowData.created_by_username;
+
+            // Guardar en SQLite local como caché
+            try {
+              const existsLocal = db.getTicket(code);
+              if (!existsLocal) {
+                db.createTicket({
+                  code: rowData.code,
+                  amount: rowData.amount,
+                  currency: rowData.currency,
+                  mesa: mesaNombre,
+                  usuario_emision: operadorNombre
+                });
+                db.db.prepare('UPDATE tickets SET estado = ?, sincronizado = 1 WHERE code = ?')
+                  .run(rowData.estado, code);
+                console.log('💾 Voucher guardado en caché local desde Supabase');
+              }
+            } catch (e) {
+              if (VERBOSE) console.warn('No se pudo guardar en caché local:', e?.message);
+            }
+
+            console.log('✅ Voucher encontrado en Supabase:', code);
+          }
+        } catch (supaError) {
+          console.warn('⚠️  Error buscando en Supabase, intentando SQLite local:', supaError.message);
+        }
+      }
+
+      // 2. FALLBACK: Buscar en SQLite local (si no se encontró en Supabase o no está disponible)
+      if (!rowData) {
+        console.log('💾 Buscando voucher en SQLite local:', code);
+        try {
+          const info = db.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='tickets'").get();
+          if (info) {
+            const row = db.db.prepare(`SELECT * FROM tickets WHERE code = ?`).get(code);
+            if (row) {
+              mesaNombre = row.mesa_nombre || row.mesa || (row.mesa_id ? String(row.mesa_id) : 'N/A');
+              operadorNombre = row.created_by_username
+                                || row.operador_nombre
+                                || row.usuario_emision
+                                || row.created_by_email
+                                || row.operador_email
+                                || null;
+              rowData = row;
+              source = 'local';
+              console.log('✅ Voucher encontrado en SQLite local:', code);
+            }
+          }
+        } catch (e) {
+          console.warn('Error buscando en SQLite local:', e?.message);
+        }
+      }
+
+      // 3. VALIDAR RESULTADO
+      if (!rowData) {
+        return { success: false, valid: false, error: 'Voucher no encontrado en ninguna base de datos' };
+      }
+
+      // Validaciones básicas de estado
+      const estado = String(rowData.estado || 'emitido').toLowerCase();
+      if (estado === 'usado') return { success: false, valid: false, estado: 'usado', error: 'Voucher canjeado' };
+      if (estado === 'cancelado') return { success: false, valid: false, estado: 'cancelado', error: 'Voucher cancelado' };
+      if (estado === 'expirado') return { success: false, valid: false, estado: 'expirado', error: 'Voucher expirado' };
+
+      console.log('📋 Ticket validado:', {
+        code: rowData.code,
+        amount: rowData.amount,
+        currency: rowData.currency,
+        mesa: mesaNombre,
+        operador: operadorNombre,
+        source
+      });
+
+      return {
+        success: true,
+        valid: true,
+        ticket: {
+          code: rowData.code,
+          amount: Number(rowData.amount || 0),
+          currency: rowData.currency || 'DOP',
+          estado: rowData.estado || 'emitido',
+          created_at: rowData.created_at || rowData.fecha_emision || null,
+          mesa: mesaNombre || 'N/A',
+          operador: operadorNombre || 'N/A'
+        },
+        source
+      };
+    } catch (e) {
+      console.error('[validate-voucher] Error:', e?.message);
+      return { success: false, error: e?.message || String(e) };
+    }
+  });
+
+  ipcMain.handle('redeem-voucher', async (_event, code, cajeroId = 'CAJA-01') => {
+    try {
+      if (!db) throw new Error('DB no disponible');
+      const normalized = String(code || '').toUpperCase().trim();
+      if (!normalized) throw new Error('Código requerido');
+
+      // 1. CANJEAR EN SQLITE LOCAL
+      const res = db.redeemTicket(normalized, cajeroId);
+      if (!res.success) {
+        return res;
+      }
+
+      console.log('✅ Voucher canjeado en SQLite local:', normalized);
+
+      // 2. INTENTAR ACTUALIZAR EN SUPABASE (si está disponible)
+      if (supabaseManager && supabaseManager.isAvailable()) {
+        try {
+          console.log('☁️  Actualizando estado en Supabase:', normalized);
+
+          const supabaseResult = await supabaseManager.updateVoucherStatus(
+            normalized,
+            'redeemed',
+            cajeroId, // En Supabase esto debería ser un UUID, pero por ahora usamos el string
+            null // redeemed_at_station_id (si lo tienes, pásalo)
+          );
+
+          if (supabaseResult.success) {
+            console.log('✅ Voucher actualizado en Supabase:', normalized);
+          } else {
+            console.warn('⚠️  No se pudo actualizar en Supabase:', supabaseResult.error);
+          }
+        } catch (supaError) {
+          console.warn('⚠️  Error actualizando en Supabase (continuando en modo offline):', supaError.message);
+        }
+      }
+
+      return res;
+    } catch (e) {
+      console.error('[redeem-voucher] Error:', e?.message);
+      return { success: false, error: e?.message || String(e) };
+    }
+  });
+
+  ipcMain.handle('get-statistics', async () => {
+    try {
+      if (!db?.db) throw new Error('DB no disponible');
+      // Filtrar por fecha de HOY usando fecha_emision
+      const totalTickets = db.db.prepare(`
+        SELECT COUNT(*) AS total
+        FROM tickets
+        WHERE DATE(fecha_emision) = DATE('now','localtime')
+      `).get().total || 0;
+
+      const totalDOP = db.db.prepare(`
+        SELECT COALESCE(SUM(amount),0) AS total
+        FROM tickets
+        WHERE currency = 'DOP' AND DATE(fecha_emision) = DATE('now','localtime')
+      `).get().total || 0;
+
+      const totalUSD = db.db.prepare(`
+        SELECT COALESCE(SUM(amount),0) AS total
+        FROM tickets
+        WHERE currency = 'USD' AND DATE(fecha_emision) = DATE('now','localtime')
+      `).get().total || 0;
+
+      const pendientes = db.db.prepare(`
+        SELECT COUNT(*) AS total
+        FROM tickets
+        WHERE estado != 'usado' AND DATE(fecha_emision) = DATE('now','localtime')
+      `).get().total || 0;
+
+      const stats = { ticketsHoy: totalTickets, totalDOP, totalUSD, pendientes };
+      return { success: true, stats };
+    } catch (e) {
+      console.error('[get-statistics] Error:', e?.message);
+      return { success: false, error: e?.message || String(e) };
+    }
+  });
+
+  // Handler temporal: limpiar la base de datos (solo tickets)
+  ipcMain.handle('reset-database', async () => {
+    try {
+      if (!db?.db) throw new Error('DB no disponible');
+      db.db.prepare('DELETE FROM tickets').run();
+      try { db.db.prepare('DELETE FROM sqlite_sequence WHERE name = "tickets"').run(); } catch {}
+      if (VERBOSE) console.log('✅ Base de datos limpiada (tabla tickets)');
+      return { success: true, message: 'BD limpiada correctamente' };
+    } catch (error) {
+      console.error('❌ Error limpiando BD:', error?.message);
+      return { success: false, error: error?.message };
+    }
+  });
+
+  // ============================================
+  // HANDLER: sync-pending-vouchers (Sincronización manual)
+  // ============================================
+  ipcMain.handle('sync-pending-vouchers', async () => {
+    try {
+      if (!db?.db) throw new Error('DB no disponible');
+      if (!supabaseManager || !supabaseManager.isAvailable()) {
+        return { success: false, error: 'Supabase no disponible' };
+      }
+
+      console.log('🔄 Iniciando sincronización de vouchers pendientes...');
+
+      // Obtener tickets no sincronizados
+      const pendingTickets = db.db.prepare(`
+        SELECT * FROM tickets
+        WHERE sincronizado = 0 OR sincronizado IS NULL
+        ORDER BY fecha_emision DESC
+      `).all();
+
+      if (pendingTickets.length === 0) {
+        console.log('✅ No hay vouchers pendientes de sincronizar');
+        return { success: true, synced: 0, failed: 0, message: 'No hay vouchers pendientes' };
+      }
+
+      console.log(`📊 Encontrados ${pendingTickets.length} vouchers pendientes`);
+
+      // Sincronizar con Supabase
+      const result = await supabaseManager.syncPendingVouchers(pendingTickets);
+
+      // Marcar como sincronizados los exitosos
+      if (result.synced > 0) {
+        for (const ticket of pendingTickets) {
+          try {
+            db.db.prepare('UPDATE tickets SET sincronizado = 1 WHERE code = ?').run(ticket.code);
+          } catch (e) {
+            console.warn(`⚠️  No se pudo marcar como sincronizado: ${ticket.code}`);
+          }
+        }
+      }
+
+      console.log(`✅ Sincronización completada: ${result.synced} exitosos, ${result.failed} fallidos`);
+
+      return {
+        success: true,
+        synced: result.synced,
+        failed: result.failed,
+        message: `Sincronizados ${result.synced} de ${pendingTickets.length} vouchers`
+      };
+    } catch (error) {
+      console.error('❌ Error sincronizando vouchers:', error?.message);
+      return { success: false, error: error?.message };
+    }
+  });
+
+  // ============================================
+  // HANDLERS: Gestión de Operadores
+  // ============================================
+
+  // Obtener operadores activos (para dropdown en Mesa)
+  ipcMain.handle('get-operadores-activos', async (event) => {
+    try {
+      console.log('📋 [Operadores] Obteniendo operadores activos...');
+
+      if (!supabaseManager || !supabaseManager.isAvailable()) {
+        console.warn('⚠️ Supabase no disponible - retornando lista vacía');
+        return { success: true, operadores: [] };
+      }
+
+      const { data, error } = await supabaseManager.client
+        .from('operadores')
+        .select('*')
+        .eq('activo', true)
+        .order('nombre');
+
+      if (error) {
+        console.error('❌ Error obteniendo operadores:', error);
+        return { success: false, error: error.message };
+      }
+
+      console.log(`✅ Operadores activos obtenidos: ${data?.length || 0}`);
+      return { success: true, operadores: data || [] };
+    } catch (error) {
+      console.error('❌ Error en get-operadores-activos:', error?.message);
+      return { success: false, error: error?.message };
+    }
+  });
+
+  // Obtener todos los operadores (activos e inactivos) - Solo Admin
+  ipcMain.handle('get-all-operadores', async (event) => {
+    try {
+      console.log('📋 [Operadores] Obteniendo todos los operadores...');
+
+      // TODO: Verificar que el usuario actual es admin
+      // if (currentSession?.user?.role !== 'ADMIN') {
+      //   return { success: false, error: 'No autorizado' };
+      // }
+
+      if (!supabaseManager || !supabaseManager.isAvailable()) {
+        console.warn('⚠️ Supabase no disponible');
+        return { success: false, error: 'Supabase no disponible' };
+      }
+
+      const { data, error } = await supabaseManager.client
+        .from('operadores')
+        .select('*')
+        .order('activo', { ascending: false })
+        .order('nombre');
+
+      if (error) {
+        console.error('❌ Error obteniendo todos los operadores:', error);
+        return { success: false, error: error.message };
+      }
+
+      console.log(`✅ Total operadores obtenidos: ${data?.length || 0}`);
+      return { success: true, operadores: data || [] };
+    } catch (error) {
+      console.error('❌ Error en get-all-operadores:', error?.message);
+      return { success: false, error: error?.message };
+    }
+  });
+
+  // Crear nuevo operador - Solo Admin
+  ipcMain.handle('create-operador', async (event, operadorData) => {
+    try {
+      console.log('➕ [Operadores] Creando operador:', operadorData);
+
+      // TODO: Verificar rol de admin
+      // if (currentSession?.user?.role !== 'ADMIN') {
+      //   return { success: false, error: 'No autorizado - Solo admin puede crear operadores' };
+      // }
+
+      if (!operadorData?.nombre) {
+        return { success: false, error: 'Nombre del operador es requerido' };
+      }
+
+      if (!supabaseManager || !supabaseManager.isAvailable()) {
+        return { success: false, error: 'Supabase no disponible' };
+      }
+
+      const { data, error } = await supabaseManager.client
+        .from('operadores')
+        .insert({
+          nombre: operadorData.nombre,
+          activo: true,
+          mesas_asignadas: operadorData.mesas || []
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('❌ Error creando operador:', error);
+        return { success: false, error: error.message };
+      }
+
+      console.log('✅ Operador creado exitosamente:', data);
+      return { success: true, operador: data };
+    } catch (error) {
+      console.error('❌ Error en create-operador:', error?.message);
+      return { success: false, error: error?.message };
+    }
+  });
+
+  // Actualizar operador - Solo Admin
+  ipcMain.handle('update-operador', async (event, operadorId, updates) => {
+    try {
+      console.log('✏️ [Operadores] Actualizando operador:', operadorId, updates);
+
+      // TODO: Verificar rol de admin
+      // if (currentSession?.user?.role !== 'ADMIN') {
+      //   return { success: false, error: 'No autorizado' };
+      // }
+
+      if (!supabaseManager || !supabaseManager.isAvailable()) {
+        return { success: false, error: 'Supabase no disponible' };
+      }
+
+      const { data, error } = await supabaseManager.client
+        .from('operadores')
+        .update({
+          ...updates,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', operadorId)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('❌ Error actualizando operador:', error);
+        return { success: false, error: error.message };
+      }
+
+      console.log('✅ Operador actualizado exitosamente:', data);
+      return { success: true, operador: data };
+    } catch (error) {
+      console.error('❌ Error en update-operador:', error?.message);
+      return { success: false, error: error?.message };
+    }
+  });
+
+  // Activar/Desactivar operador - Solo Admin
+  ipcMain.handle('toggle-operador', async (event, operadorId, activo) => {
+    try {
+      console.log(`🔄 [Operadores] ${activo ? 'Activando' : 'Desactivando'} operador:`, operadorId);
+
+      // TODO: Verificar rol de admin
+      // if (currentSession?.user?.role !== 'ADMIN') {
+      //   return { success: false, error: 'No autorizado' };
+      // }
+
+      if (!supabaseManager || !supabaseManager.isAvailable()) {
+        return { success: false, error: 'Supabase no disponible' };
+      }
+
+      const { data, error } = await supabaseManager.client
+        .from('operadores')
+        .update({
+          activo: activo,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', operadorId)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('❌ Error cambiando estado de operador:', error);
+        return { success: false, error: error.message };
+      }
+
+      console.log(`✅ Operador ${activo ? 'activado' : 'desactivado'} exitosamente:`, data);
+      return { success: true, operador: data };
+    } catch (error) {
+      console.error('❌ Error en toggle-operador:', error?.message);
+      return { success: false, error: error?.message };
+    }
+  });
+
+  // ============================================
+  // HANDLERS: Gestión de Usuarios
+  // ============================================
+
+  // Obtener todos los usuarios del sistema - Solo Admin
+  ipcMain.handle('get-all-users', async (event) => {
+    try {
+      console.log('👨‍💼 [Usuarios] Obteniendo todos los usuarios...');
+
+      // TODO: Verificar que el usuario actual es admin
+      // if (currentSession?.user?.role !== 'ADMIN') {
+      //   return { success: false, error: 'No autorizado' };
+      // }
+
+      if (!supabaseManager || !supabaseManager.isAvailable()) {
+        console.warn('⚠️ Supabase no disponible');
+        return { success: false, error: 'Supabase no disponible' };
+      }
+
+      const { data, error } = await supabaseManager.client
+        .from('users')
+        .select('id, email, full_name, role, pin_code, is_active, station_id, created_at')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('❌ Error obteniendo usuarios:', error);
+        return { success: false, error: error.message };
+      }
+
+      console.log(`✅ Total usuarios obtenidos: ${data?.length || 0}`);
+      return { success: true, users: data || [] };
+    } catch (error) {
+      console.error('❌ Error en get-all-users:', error?.message);
+      return { success: false, error: error?.message };
+    }
+  });
+
+  // Crear nuevo usuario - Solo Admin
+  ipcMain.handle('create-user', async (event, userData) => {
+    try {
+      console.log('➕ [Usuarios] Creando usuario:', userData.email);
+
+      // TODO: Verificar rol de admin
+      // if (currentSession?.user?.role !== 'ADMIN') {
+      //   return { success: false, error: 'No autorizado - Solo admin puede crear usuarios' };
+      // }
+
+      // Validaciones
+      if (!userData?.email) {
+        return { success: false, error: 'Email es requerido' };
+      }
+      if (!userData?.full_name) {
+        return { success: false, error: 'Nombre completo es requerido' };
+      }
+      if (!userData?.role) {
+        return { success: false, error: 'Rol es requerido' };
+      }
+      if (!userData?.password) {
+        return { success: false, error: 'Contraseña es requerida' };
+      }
+      if (userData.password.length < 6) {
+        return { success: false, error: 'Contraseña debe tener mínimo 6 caracteres' };
+      }
+
+      if (!supabaseManager || !supabaseManager.isAvailable()) {
+        return { success: false, error: 'Supabase no disponible' };
+      }
+
+      // Crear usuario en Supabase Auth (usando Admin API para auto-confirmar)
+      const { data: authData, error: authError } = await supabaseManager.client.auth.admin.createUser({
+        email: userData.email,
+        password: userData.password,
+        email_confirm: true // ✅ Auto-confirmar email (aplicación interna)
+      });
+
+      if (authError) {
+        console.error('❌ Error creando usuario en Auth:', authError);
+        return { success: false, error: authError.message };
+      }
+
+      // Actualizar el perfil del usuario en la tabla users
+      const { data: profileData, error: profileError } = await supabaseManager.client
+        .from('users')
+        .upsert({
+          id: authData.user.id,
+          email: userData.email,
+          full_name: userData.full_name,
+          role: userData.role.toLowerCase(), // ✅ Convertir a minúsculas
+          pin_code: userData.pin_code || null,
+          is_active: true
+        })
+        .select()
+        .single();
+
+      if (profileError) {
+        console.error('❌ Error actualizando perfil:', profileError);
+        return { success: false, error: profileError.message };
+      }
+
+      console.log('✅ Usuario creado exitosamente:', profileData);
+      return { success: true, user: profileData };
+    } catch (error) {
+      console.error('❌ Error en create-user:', error?.message);
+      return { success: false, error: error?.message };
+    }
+  });
+
+  // Actualizar usuario existente - Solo Admin
+  ipcMain.handle('update-user', async (event, userId, updates) => {
+    try {
+      console.log('✏️ [Usuarios] Actualizando usuario:', userId);
+
+      // TODO: Verificar rol de admin
+      // if (currentSession?.user?.role !== 'ADMIN') {
+      //   return { success: false, error: 'No autorizado' };
+      // }
+
+      if (!supabaseManager || !supabaseManager.isAvailable()) {
+        return { success: false, error: 'Supabase no disponible' };
+      }
+
+      // No permitir actualizar ciertos campos
+      delete updates.id;
+      delete updates.email; // Email no se puede cambiar fácilmente en Supabase Auth
+
+      // ✅ Convertir role a minúsculas si existe
+      if (updates.role) {
+        updates.role = updates.role.toLowerCase();
+      }
+
+      const { data, error } = await supabaseManager.client
+        .from('users')
+        .update(updates)
+        .eq('id', userId)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('❌ Error actualizando usuario:', error);
+        return { success: false, error: error.message };
+      }
+
+      console.log('✅ Usuario actualizado exitosamente:', data);
+      return { success: true, user: data };
+    } catch (error) {
+      console.error('❌ Error en update-user:', error?.message);
+      return { success: false, error: error?.message };
+    }
+  });
+
+  // Activar/Desactivar usuario - Solo Admin
+  ipcMain.handle('toggle-user', async (event, userId, isActive) => {
+    try {
+      console.log(`🔄 [Usuarios] ${isActive ? 'Activando' : 'Desactivando'} usuario:`, userId);
+
+      // TODO: Verificar rol de admin
+      // if (currentSession?.user?.role !== 'ADMIN') {
+      //   return { success: false, error: 'No autorizado' };
+      // }
+
+      if (!supabaseManager || !supabaseManager.isAvailable()) {
+        return { success: false, error: 'Supabase no disponible' };
+      }
+
+      const { data, error } = await supabaseManager.client
+        .from('users')
+        .update({ is_active: isActive })
+        .eq('id', userId)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('❌ Error cambiando estado de usuario:', error);
+        return { success: false, error: error.message };
+      }
+
+      console.log(`✅ Usuario ${isActive ? 'activado' : 'desactivado'} exitosamente:`, data);
+      return { success: true, user: data };
+    } catch (error) {
+      console.error('❌ Error en toggle-user:', error?.message);
+      return { success: false, error: error?.message };
+    }
+  });
+
+  // Cambiar contraseña de usuario - Solo Admin
+  ipcMain.handle('change-user-password', async (event, userId, newPassword) => {
+    try {
+      console.log('🔑 [Usuarios] Cambiando contraseña de usuario:', userId);
+
+      // TODO: Verificar rol de admin
+      // if (currentSession?.user?.role !== 'ADMIN') {
+      //   return { success: false, error: 'No autorizado' };
+      // }
+
+      if (!newPassword || newPassword.length < 6) {
+        return { success: false, error: 'Contraseña debe tener mínimo 6 caracteres' };
+      }
+
+      if (!supabaseManager || !supabaseManager.isAvailable()) {
+        return { success: false, error: 'Supabase no disponible' };
+      }
+
+      // Actualizar contraseña en Supabase Auth (requiere permisos de admin)
+      const { data, error } = await supabaseManager.client.auth.admin.updateUserById(
+        userId,
+        { password: newPassword }
+      );
+
+      if (error) {
+        console.error('❌ Error cambiando contraseña:', error);
+        return { success: false, error: error.message };
+      }
+
+      console.log('✅ Contraseña actualizada exitosamente');
+      return { success: true };
+    } catch (error) {
+      console.error('❌ Error en change-user-password:', error?.message);
+      return { success: false, error: error?.message };
+    }
+  });
+
+  // ============================================
+  // HANDLERS: Auditoría (Solo Lectura)
+  // ============================================
+
+  // Obtener estadísticas del día para dashboard
+  ipcMain.handle('get-audit-stats', async (event, fecha = null) => {
+    try {
+      console.log('📊 [Auditoría] Obteniendo estadísticas...');
+      console.log('📊 [Auditoría] Fecha solicitada:', fecha || 'HOY');
+
+      // Fecha por defecto: hoy
+      const targetDate = fecha ? new Date(fecha) : new Date();
+      const startOfDay = new Date(targetDate.setHours(0, 0, 0, 0)).toISOString();
+      const endOfDay = new Date(targetDate.setHours(23, 59, 59, 999)).toISOString();
+
+      console.log('📊 [Auditoría] Rango de fechas:', { startOfDay, endOfDay });
+
+      // Intentar obtener de Supabase primero
+      if (supabaseManager && supabaseManager.isAvailable()) {
+        console.log('📊 [Auditoría] Consultando Supabase...');
+        try {
+          const { data, error } = await supabaseManager.client
+            .from('vouchers')
+            .select('*')
+            .gte('issued_at', startOfDay)
+            .lte('issued_at', endOfDay);
+
+          if (error) {
+            console.warn('⚠️ [Auditoría] Error en Supabase:', error);
+          } else {
+            console.log(`📊 [Auditoría] Supabase retornó ${data?.length || 0} vouchers`);
+            if (data && data.length > 0) {
+              const stats = calcularEstadisticas(data);
+              console.log('✅ Estadísticas obtenidas de Supabase:', stats);
+              return { success: true, stats, source: 'supabase' };
+            } else {
+              console.log('⚠️ [Auditoría] Supabase retornó 0 vouchers, intentando SQLite...');
+            }
+          }
+        } catch (supaError) {
+          console.warn('⚠️ [Auditoría] Excepción en Supabase:', supaError);
+        }
+      } else {
+        console.log('⚠️ [Auditoría] Supabase no disponible');
+      }
+
+      // Fallback: SQLite local
+      console.log('📊 [Auditoría] Consultando SQLite local...');
+      if (!db || !db.db) {
+        console.error('❌ [Auditoría] Base de datos SQLite no disponible');
+        return { success: false, error: 'Base de datos no disponible' };
+      }
+
+      const tickets = db.db.prepare(`
+        SELECT * FROM tickets
+        WHERE fecha_emision >= ? AND fecha_emision <= ?
+      `).all(startOfDay, endOfDay);
+
+      console.log(`📊 [Auditoría] SQLite retornó ${tickets.length} tickets`);
+      console.log('📊 [Auditoría] Primeros 2 tickets:', tickets.slice(0, 2));
+
+      const stats = calcularEstadisticas(tickets);
+      console.log('✅ Estadísticas obtenidas de SQLite:', stats);
+      return { success: true, stats, source: 'sqlite' };
+
+    } catch (error) {
+      console.error('❌ [Auditoría] Error obteniendo estadísticas:', error);
+      console.error('❌ [Auditoría] Stack:', error?.stack);
+      return { success: false, error: error?.message || String(error) };
+    }
+  });
+
+  // Función helper para calcular estadísticas
+  function calcularEstadisticas(tickets) {
+    const emitidos = tickets.filter(t =>
+      ['emitido', 'active', 'activo'].includes(String(t.estado || t.status || '').toLowerCase())
+    );
+    const canjeados = tickets.filter(t =>
+      ['canjeado', 'redeemed', 'usado'].includes(String(t.estado || t.status || '').toLowerCase())
+    );
+    const cancelados = tickets.filter(t =>
+      ['cancelado', 'cancelled'].includes(String(t.estado || t.status || '').toLowerCase())
+    );
+
+    const totalDOP = tickets
+      .filter(t => (t.currency || t.moneda) === 'DOP')
+      .reduce((sum, t) => sum + (Number(t.amount || t.valor) || 0), 0);
+
+    const totalUSD = tickets
+      .filter(t => (t.currency || t.moneda) === 'USD')
+      .reduce((sum, t) => sum + (Number(t.amount || t.valor) || 0), 0);
+
+    const canjeadosDOP = canjeados
+      .filter(t => (t.currency || t.moneda) === 'DOP')
+      .reduce((sum, t) => sum + (Number(t.amount || t.valor) || 0), 0);
+
+    const canjeadosUSD = canjeados
+      .filter(t => (t.currency || t.moneda) === 'USD')
+      .reduce((sum, t) => sum + (Number(t.amount || t.valor) || 0), 0);
+
+    return {
+      total: tickets.length,
+      emitidos: emitidos.length,
+      canjeados: canjeados.length,
+      cancelados: cancelados.length,
+      pendientes: emitidos.length,
+      totalDOP: totalDOP.toFixed(2),
+      totalUSD: totalUSD.toFixed(2),
+      canjeadosDOP: canjeadosDOP.toFixed(2),
+      canjeadosUSD: canjeadosUSD.toFixed(2),
+      pendientesDOP: (totalDOP - canjeadosDOP).toFixed(2),
+      pendientesUSD: (totalUSD - canjeadosUSD).toFixed(2)
+    };
+  }
+
+  // Obtener tickets con filtros para auditoría
+  ipcMain.handle('get-audit-tickets', async (event, filtros = {}) => {
+    try {
+      console.log('📋 [Auditoría] Obteniendo tickets con filtros:', JSON.stringify(filtros, null, 2));
+
+      const {
+        fechaDesde,
+        fechaHasta,
+        estado,
+        moneda,
+        mesa,
+        operador,
+        page = 1,
+        limit = 20
+      } = filtros;
+
+      console.log('📋 [Auditoría] Parámetros extraídos:', { fechaDesde, fechaHasta, estado, moneda, mesa, operador, page, limit });
+
+      // Intentar Supabase primero
+      if (supabaseManager && supabaseManager.isAvailable()) {
+        console.log('📋 [Auditoría] Consultando Supabase...');
+        try {
+          // Query simplificado SIN joins para evitar errores
+          let query = supabaseManager.client
+            .from('vouchers')
+            .select('*', { count: 'exact' });
+
+          // Aplicar filtros
+          if (fechaDesde) {
+            const isoFechaDesde = new Date(fechaDesde).toISOString();
+            console.log('📋 [Auditoría] Filtro fechaDesde:', isoFechaDesde);
+            query = query.gte('issued_at', isoFechaDesde);
+          }
+          if (fechaHasta) {
+            // Crear fecha al final del día en UTC (sin cambio de timezone)
+            const fechaFin = new Date(fechaHasta);
+            fechaFin.setUTCHours(23, 59, 59, 999);
+            const isoFechaHasta = fechaFin.toISOString();
+            console.log('📋 [Auditoría] Filtro fechaHasta:', isoFechaHasta);
+            query = query.lte('issued_at', isoFechaHasta);
+          }
+          if (estado) {
+            console.log('📋 [Auditoría] Filtro estado (frontend):', estado);
+            // Mapear estados frontend → Supabase
+            const estadoMap = {
+              'emitido': 'active',
+              'activo': 'active',
+              'canjeado': 'redeemed',
+              'usado': 'redeemed',
+              'cancelado': 'cancelled'
+            };
+            const estadoSupabase = estadoMap[estado.toLowerCase()] || estado;
+            console.log('📋 [Auditoría] Filtro estado (Supabase):', estadoSupabase);
+            query = query.eq('status', estadoSupabase);
+          }
+          if (moneda) {
+            console.log('📋 [Auditoría] Filtro moneda:', moneda);
+            query = query.eq('currency', moneda);
+          }
+          if (mesa) {
+            console.log('📋 [Auditoría] Filtro mesa (station_id):', mesa);
+            // Intentar convertir "P01" a número 1, "P02" a 2, etc.
+            const stationNum = mesa.match(/\d+/);
+            if (stationNum) {
+              query = query.eq('issued_at_station_id', parseInt(stationNum[0]));
+            }
+          }
+
+          // Paginación
+          const offset = (page - 1) * limit;
+          console.log('📋 [Auditoría] Paginación - offset:', offset, 'limit:', limit);
+          query = query.order('issued_at', { ascending: false }).range(offset, offset + limit - 1);
+
+          const { data, error, count } = await query;
+
+          if (error) {
+            console.warn('⚠️ [Auditoría] Error en Supabase:', error);
+            console.warn('⚠️ [Auditoría] Error details:', error.message, error.details);
+          } else {
+            console.log(`📋 [Auditoría] Supabase retornó ${data?.length || 0} vouchers de ${count} totales`);
+            console.log('📋 [Auditoría] Primeros 2 vouchers:', data?.slice(0, 2));
+            if (data && data.length > 0) {
+              const tickets = mapearVouchersSupabase(data);
+              console.log('✅ [Auditoría] Tickets mapeados:', tickets.slice(0, 2));
+              return {
+                success: true,
+                tickets,
+                total: count,
+                page,
+                totalPages: Math.ceil(count / limit),
+                source: 'supabase'
+              };
+            } else if (count === 0) {
+              console.log('⚠️ [Auditoría] Supabase retornó 0 vouchers, intentando SQLite...');
+            }
+          }
+        } catch (supaError) {
+          console.warn('⚠️ [Auditoría] Excepción en Supabase:', supaError);
+        }
+      } else {
+        console.log('⚠️ [Auditoría] Supabase no disponible');
+      }
+
+      // Fallback: SQLite local
+      console.log('📋 [Auditoría] Consultando SQLite local...');
+      if (!db || !db.db) {
+        console.error('❌ [Auditoría] Base de datos SQLite no disponible');
+        return { success: false, error: 'Base de datos no disponible', tickets: [], total: 0, page: 1, totalPages: 0 };
+      }
+
+      let whereClauses = [];
+      let params = [];
+
+      if (fechaDesde) {
+        whereClauses.push('fecha_emision >= ?');
+        params.push(new Date(fechaDesde).toISOString());
+      }
+      if (fechaHasta) {
+        whereClauses.push('fecha_emision <= ?');
+        const fechaFin = new Date(fechaHasta);
+        fechaFin.setUTCHours(23, 59, 59, 999);
+        params.push(fechaFin.toISOString());
+      }
+      if (estado) {
+        whereClauses.push('estado = ?');
+        params.push(estado);
+      }
+      if (moneda) {
+        whereClauses.push('currency = ?');
+        params.push(moneda);
+      }
+      if (mesa) {
+        whereClauses.push('mesa = ?');
+        params.push(mesa);
+      }
+      if (operador) {
+        whereClauses.push('notas LIKE ?');
+        params.push(`%${operador}%`);
+      }
+
+      const whereSQL = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
+
+      // Contar total
+      const countQuery = `SELECT COUNT(*) as total FROM tickets ${whereSQL}`;
+      console.log('📋 [Auditoría] Query SQLite COUNT:', countQuery);
+      console.log('📋 [Auditoría] Parámetros COUNT:', params);
+      const { total } = db.db.prepare(countQuery).get(...params);
+
+      // Obtener tickets paginados
+      const offset = (page - 1) * limit;
+      const ticketsQuery = `
+        SELECT
+          code,
+          amount,
+          currency,
+          mesa,
+          estado,
+          fecha_emision as created_at,
+          fecha_cobro as used_at,
+          notas as operador
+        FROM tickets ${whereSQL}
+        ORDER BY fecha_emision DESC
+        LIMIT ? OFFSET ?
+      `;
+      console.log('📋 [Auditoría] Query SQLite SELECT:', ticketsQuery);
+      console.log('📋 [Auditoría] Parámetros SELECT:', [...params, limit, offset]);
+      const tickets = db.db.prepare(ticketsQuery).all(...params, limit, offset);
+
+      console.log(`✅ ${tickets.length} tickets obtenidos de SQLite (total: ${total})`);
+      return {
+        success: true,
+        tickets,
+        total,
+        page,
+        totalPages: Math.ceil(total / limit),
+        source: 'sqlite'
+      };
+
+    } catch (error) {
+      console.error('❌ Error obteniendo tickets:', error?.message);
+      return { success: false, error: error?.message };
+    }
+  });
+
+  // Función helper para mapear vouchers de Supabase a formato esperado
+  function mapearVouchersSupabase(vouchers) {
+    return vouchers.map(v => ({
+      code: v.voucher_code,
+      amount: v.amount,
+      currency: v.currency,
+      estado: v.status === 'active' ? 'emitido' :
+              v.status === 'redeemed' ? 'canjeado' :
+              v.status === 'cancelled' ? 'cancelado' : v.status,
+      created_at: v.issued_at,
+      used_at: v.redeemed_at,
+      // Mesa: formatear station_id como "Mesa X"
+      mesa: v.issued_at_station_id ? `Mesa ${v.issued_at_station_id}` : 'N/A',
+      // Operador: usar customer_name si existe, sino mostrar ID
+      operador: v.customer_name || (v.issued_by_user_id ? `Usuario ${v.issued_by_user_id.substring(0, 8)}` : 'N/A')
+    }));
+  }
+
+  // Exportar reporte de auditoría a CSV
+  ipcMain.handle('export-audit-report', async (event, filtros = {}) => {
+    try {
+      console.log('📥 [Auditoría] Exportando reporte...');
+      console.log('📥 [Auditoría] Filtros recibidos:', filtros);
+
+      let tickets = [];
+
+      // ==========================================
+      // PASO 1: INTENTAR SUPABASE PRIMERO
+      // ==========================================
+      if (supabaseManager && supabaseManager.isAvailable()) {
+        console.log('📥 [Auditoría] Consultando Supabase para exportar...');
+        try {
+          let query = supabaseManager.client
+            .from('vouchers')
+            .select('*');
+
+          // Aplicar filtros
+          if (filtros.fechaDesde) {
+            const isoFechaDesde = new Date(filtros.fechaDesde).toISOString();
+            query = query.gte('issued_at', isoFechaDesde);
+          }
+          if (filtros.fechaHasta) {
+            const fechaFin = new Date(filtros.fechaHasta);
+            fechaFin.setUTCHours(23, 59, 59, 999);
+            query = query.lte('issued_at', fechaFin.toISOString());
+          }
+          if (filtros.estado) {
+            const estadoMap = {
+              'emitido': 'active',
+              'activo': 'active',
+              'canjeado': 'redeemed',
+              'usado': 'redeemed',
+              'cancelado': 'cancelled'
+            };
+            const estadoSupabase = estadoMap[filtros.estado.toLowerCase()] || filtros.estado;
+            query = query.eq('status', estadoSupabase);
+          }
+          if (filtros.moneda) {
+            query = query.eq('currency', filtros.moneda);
+          }
+          if (filtros.mesa) {
+            const stationNum = filtros.mesa.match(/\d+/);
+            if (stationNum) {
+              query = query.eq('issued_at_station_id', parseInt(stationNum[0]));
+            }
+          }
+
+          query = query.order('issued_at', { ascending: false }).limit(10000);
+
+          const { data, error } = await query;
+
+          if (error) {
+            console.warn('⚠️ [Auditoría] Error en Supabase:', error);
+          } else if (data && data.length > 0) {
+            console.log(`✅ [Auditoría] Supabase retornó ${data.length} vouchers para exportar`);
+            tickets = mapearVouchersSupabase(data);
+          } else {
+            console.log('⚠️ [Auditoría] Supabase retornó 0 vouchers, intentando SQLite...');
+          }
+        } catch (supaError) {
+          console.warn('⚠️ [Auditoría] Excepción en Supabase:', supaError);
+        }
+      } else {
+        console.log('⚠️ [Auditoría] Supabase no disponible');
+      }
+
+      // ==========================================
+      // PASO 2: FALLBACK A SQLITE SI ES NECESARIO
+      // ==========================================
+      if (tickets.length === 0) {
+        console.log('📥 [Auditoría] Consultando SQLite para exportar...');
+        try {
+          if (!db || !db.db) {
+            return { success: false, error: 'No hay tickets disponibles para exportar' };
+          }
+
+          let whereClauses = [];
+          let params = [];
+
+          if (filtros.fechaDesde) {
+            whereClauses.push('fecha_emision >= ?');
+            params.push(new Date(filtros.fechaDesde).toISOString());
+          }
+          if (filtros.fechaHasta) {
+            whereClauses.push('fecha_emision <= ?');
+            const fechaFin = new Date(filtros.fechaHasta);
+            fechaFin.setUTCHours(23, 59, 59, 999);
+            params.push(fechaFin.toISOString());
+          }
+          if (filtros.estado) {
+            whereClauses.push('estado = ?');
+            params.push(filtros.estado);
+          }
+          if (filtros.moneda) {
+            whereClauses.push('currency = ?');
+            params.push(filtros.moneda);
+          }
+          if (filtros.mesa) {
+            whereClauses.push('mesa = ?');
+            params.push(filtros.mesa);
+          }
+
+          const whereSQL = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
+
+          const ticketsQuery = `
+            SELECT
+              code,
+              amount,
+              currency,
+              mesa,
+              estado,
+              fecha_emision as created_at,
+              fecha_cobro as used_at,
+              notas as operador
+            FROM tickets ${whereSQL}
+            ORDER BY fecha_emision DESC
+          `;
+
+          tickets = db.db.prepare(ticketsQuery).all(...params);
+          console.log(`📥 [Auditoría] SQLite retornó ${tickets.length} tickets para exportar`);
+
+        } catch (dbError) {
+          console.error('❌ Error consultando SQLite:', dbError);
+          return { success: false, error: dbError.message };
+        }
+      }
+
+      if (tickets.length === 0) {
+        console.log('⚠️ No hay tickets para exportar');
+        return { success: false, error: 'No hay tickets para exportar con los filtros especificados' };
+      }
+
+      // Generar CSV
+      const csv = generarCSV(tickets);
+
+      // Guardar archivo
+      const fs = require('fs');
+      const os = require('os');
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+      const filename = `auditoria-${timestamp}.csv`;
+      const filepath = path.join(os.tmpdir(), filename);
+
+      fs.writeFileSync(filepath, csv, 'utf8');
+
+      console.log('✅ Reporte exportado:', filepath);
+      return { success: true, filepath, filename, totalRecords: tickets.length };
+
+    } catch (error) {
+      console.error('❌ Error exportando reporte:', error?.message);
+      console.error('❌ Stack:', error?.stack);
+      return { success: false, error: error?.message };
+    }
+  });
+
+  // Función helper para generar CSV
+  function generarCSV(tickets) {
+    const headers = ['Código', 'Monto', 'Moneda', 'Estado', 'Mesa', 'Operador', 'Fecha Emisión', 'Fecha Canje'];
+    const rows = tickets.map(t => [
+      t.code || t.voucher_code,
+      t.amount || t.valor,
+      t.currency || t.moneda,
+      t.estado || t.status,
+      t.mesa || t.mesa_nombre || 'N/A',
+      t.operador || t.operador_nombre || t.created_by_username || 'N/A',
+      t.created_at || t.issued_at,
+      t.used_at || t.redeemed_at || '-'
+    ]);
+
+    // Convertir a CSV
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+    ].join('\n');
+
+    return '\uFEFF' + csvContent; // BOM para UTF-8
+  }
+
+  // Abrir ubicación de archivo exportado
+  ipcMain.handle('open-file-location', async (event, filepath) => {
+    try {
+      console.log('📂 [Auditoría] Abriendo ubicación:', filepath);
+      const { shell } = require('electron');
+      await shell.showItemInFolder(filepath);
+      return { success: true };
+    } catch (error) {
+      console.error('❌ Error abriendo ubicación:', error?.message);
+      return { success: false, error: error?.message };
+    }
+  });
+
+  // ============================================
+  // HANDLER: health-check (Monitoreo de salud)
+  // ============================================
+  ipcMain.handle('health-check', async () => {
+    try {
+      if (!healthMonitor) {
+        return { success: false, error: 'Health monitor no inicializado' };
+      }
+
+      const stats = healthMonitor.getHealthStats();
+
+      return {
+        success: true,
+        health: {
+          status: stats.isHealthy ? 'healthy' : 'unhealthy',
+          uptime: stats.uptime,
+          uptimeHuman: formatUptime(stats.uptime),
+          runningOperations: stats.runningOperations,
+          runningDetails: stats.runningDetails,
+          timedoutOperations: stats.timedoutOperations,
+          averages: stats.averages,
+          counts: stats.counts,
+          lastHeartbeat: stats.lastHeartbeat,
+          timeSinceHeartbeat: Date.now() - stats.lastHeartbeat
+        }
+      };
+    } catch (error) {
+      console.error('❌ Error en health-check:', error?.message);
+      return { success: false, error: error?.message };
+    }
+  });
+
+  // Función helper para formatear uptime
+  function formatUptime(ms) {
+    const seconds = Math.floor(ms / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+
+    if (days > 0) return `${days}d ${hours % 24}h ${minutes % 60}m`;
+    if (hours > 0) return `${hours}h ${minutes % 60}m ${seconds % 60}s`;
+    if (minutes > 0) return `${minutes}m ${seconds % 60}s`;
+    return `${seconds}s`;
+  }
+
+  // ============================================
+  // HANDLER: sync:get-pending-count
+  // Obtener cantidad de tickets pendientes de sincronización
+  // ============================================
+  ipcMain.handle('sync:get-pending-count', async () => {
+    try {
+      if (!db || !db.db) {
+        return { success: false, error: 'Base de datos no disponible' };
+      }
+
+      const result = db.db.prepare(
+        'SELECT COUNT(*) as count FROM tickets WHERE sincronizado = 0'
+      ).get();
+
+      return {
+        success: true,
+        count: result.count || 0
+      };
+    } catch (error) {
+      console.error('❌ Error obteniendo tickets pendientes:', error?.message);
+      return { success: false, error: error?.message };
+    }
+  });
+
+  // ============================================
+  // HANDLER: sync:force-sync
+  // Forzar sincronización manual inmediata
+  // ============================================
+  ipcMain.handle('sync:force-sync', async () => {
+    try {
+      console.log('🔄 [Sync Manual] Iniciando sincronización manual...');
+
+      if (!supabaseManager || !supabaseManager.isAvailable() || !supabaseManager.isConnected) {
+        return {
+          success: false,
+          error: 'No hay conexión a Supabase'
+        };
+      }
+
+      if (!db || !db.db) {
+        return {
+          success: false,
+          error: 'Base de datos no disponible'
+        };
+      }
+
+      // Buscar tickets no sincronizados
+      const pendingTickets = db.db.prepare(
+        'SELECT * FROM tickets WHERE sincronizado = 0 ORDER BY created_at ASC'
+      ).all();
+
+      if (pendingTickets.length === 0) {
+        return {
+          success: true,
+          message: 'No hay tickets pendientes de sincronización',
+          synced: 0,
+          failed: 0
+        };
+      }
+
+      console.log(`🔄 [Sync Manual] Encontrados ${pendingTickets.length} tickets pendientes`);
+
+      let successCount = 0;
+      let errorCount = 0;
+
+      for (const ticket of pendingTickets) {
+        try {
+          const userId = currentSession?.user?.id || null;
+
+          const result = await supabaseManager.createVoucher({
+            voucher_code: ticket.code,
+            amount: ticket.amount,
+            currency: ticket.currency || 'USD',
+            issued_by_user_id: userId,
+            issued_at_station_id: ticket.mesa || ticket.mesa_nombre || 'unknown',
+            status: ticket.estado === 'active' ? 'active' : 'redeemed',
+            created_at: ticket.created_at,
+            redeemed_at: ticket.redeemed_at || null,
+            redeemed_by_user_id: ticket.redeemed_by || null
+          });
+
+          if (result.success) {
+            db.db.prepare(
+              'UPDATE tickets SET sincronizado = 1 WHERE id = ?'
+            ).run(ticket.id);
+
+            successCount++;
+            console.log(`✅ [Sync Manual] Ticket ${ticket.code} sincronizado`);
+          } else {
+            errorCount++;
+            console.warn(`⚠️  [Sync Manual] No se pudo sincronizar ticket ${ticket.code}:`, result.error);
+          }
+        } catch (error) {
+          errorCount++;
+          console.error(`❌ [Sync Manual] Error sincronizando ticket ${ticket.code}:`, error.message);
+        }
+      }
+
+      console.log(`✅ [Sync Manual] Completado: ${successCount} exitosos, ${errorCount} fallidos`);
+
+      return {
+        success: true,
+        message: `Sincronización completada: ${successCount} exitosos, ${errorCount} fallidos`,
+        synced: successCount,
+        failed: errorCount
+      };
+
+    } catch (error) {
+      console.error('❌ [Sync Manual] Error:', error?.message);
+      return {
+        success: false,
+        error: error?.message
+      };
+    }
+  });
+
+  if (VERBOSE) console.log('✅ Handlers auth/rol/stats registrados');
+  if (VERBOSE) console.log('✅ Handlers vouchers básicos registrados (generate/validate/redeem/stats + sync)');
+  if (VERBOSE) console.log('✅ Handler health-check registrado');
+  if (VERBOSE) console.log('✅ Handlers sync registrados (get-pending-count, force-sync)');
+} catch (e) {
+  console.warn('No se pudieron registrar handlers de auth/rol/stats:', e.message);
+}
+
+// (preloadPath definido al inicio del archivo)
+
+// Servicios opcionales existentes (impresora, DB, IPC)
+let registerIpcHandlers;
+try {
+  registerIpcHandlers = require(path.join(__dirname, '..', 'src', 'main', 'ipc'));
+} catch (e) {
+  console.warn('No se pudo cargar registerIpcHandlers, los handlers por IPC nativos no estarán disponibles:', e.message);
+}
+
+// Instanciar servicio de impresora para los handlers mínimos (sin usar app.getPath todavía)
+let printer;
+let PrinterService;
+try {
+  PrinterService = require(path.join(__dirname, '..', 'src', 'main', 'hardware', 'printer'));
+  // NO instanciar printer aquí porque requiere app.getPath
+  // Se inicializará dentro de app.whenReady()
+} catch (e) {
+  console.warn('No se pudo cargar PrinterService:', e.message);
+}
+
+async function tryRegisterPrinterOnly() {
+  try {
+    const printerHandlersPath = path.join(__dirname, '..', 'src', 'main', 'ipc', 'printerHandlers.js');
+    const mod = require(printerHandlersPath);
+    if (mod && typeof mod.registerPrinterHandlers === 'function') {
+      await mod.registerPrinterHandlers({ printer });
+      return true;
+    }
+    if (typeof mod === 'function') {
+      await mod({ printer });
+      return true;
+    }
+    if (mod && typeof mod.default === 'function') {
+      await mod.default({ printer });
+      return true;
+    }
+  } catch (e) {
+    console.warn('No se pudieron registrar handlers de impresora de forma directa:', e.message);
+  }
+  return false;
+}
+
+// ============================================
+// WORKER DE SINCRONIZACIÓN AUTOMÁTICA
+// ============================================
+let syncWorkerInterval = null;
+
+function startSyncWorker() {
+  console.log('🔄 Iniciando worker de sincronización...');
+
+  // Ejecutar cada 2 minutos
+  syncWorkerInterval = setInterval(async () => {
+    // Skip si no hay conexión
+    if (!supabaseManager || !supabaseManager.isAvailable() || !supabaseManager.isConnected) {
+      return;
+    }
+
+    // Skip si no hay base de datos local
+    if (!db || !db.db) {
+      return;
+    }
+
+    try {
+      // Buscar tickets no sincronizados
+      const pendingTickets = db.db.prepare(
+        'SELECT * FROM tickets WHERE sincronizado = 0 ORDER BY created_at ASC'
+      ).all();
+
+      if (pendingTickets.length === 0) {
+        return; // No hay nada que sincronizar
+      }
+
+      console.log(`🔄 [Sync Worker] Sincronizando ${pendingTickets.length} tickets pendientes...`);
+
+      let successCount = 0;
+      let errorCount = 0;
+
+      for (const ticket of pendingTickets) {
+        try {
+          // Obtener datos del usuario actual si existe
+          const userId = currentSession?.user?.id || null;
+
+          // Subir a Supabase
+          const result = await supabaseManager.createVoucher({
+            voucher_code: ticket.code,
+            amount: ticket.amount,
+            currency: ticket.currency || 'USD',
+            issued_by_user_id: userId,
+            issued_at_station_id: ticket.mesa || ticket.mesa_nombre || 'unknown',
+            status: ticket.estado === 'active' ? 'active' : 'redeemed',
+            created_at: ticket.created_at,
+            redeemed_at: ticket.redeemed_at || null,
+            redeemed_by_user_id: ticket.redeemed_by || null
+          });
+
+          if (result.success) {
+            // Marcar como sincronizado
+            db.db.prepare(
+              'UPDATE tickets SET sincronizado = 1 WHERE id = ?'
+            ).run(ticket.id);
+
+            successCount++;
+            console.log(`✅ [Sync Worker] Ticket ${ticket.code} sincronizado`);
+          } else {
+            errorCount++;
+            console.warn(`⚠️  [Sync Worker] No se pudo sincronizar ticket ${ticket.code}:`, result.error);
+          }
+        } catch (error) {
+          errorCount++;
+          console.error(`❌ [Sync Worker] Error sincronizando ticket ${ticket.code}:`, error.message);
+        }
+      }
+
+      console.log(`✅ [Sync Worker] Sincronización completada: ${successCount} exitosos, ${errorCount} fallidos`);
+
+      // Notificar a ventanas abiertas si hubo sincronizaciones
+      if (successCount > 0 && mainWindow) {
+        mainWindow.webContents.send('tickets-synced', { count: successCount });
+      }
+
+    } catch (error) {
+      console.error('❌ [Sync Worker] Error en worker de sincronización:', error.message);
+    }
+  }, 2 * 60 * 1000); // 2 minutos
+
+  console.log('✅ Worker de sincronización iniciado (intervalo: 2 minutos)');
+}
+
+function stopSyncWorker() {
+  if (syncWorkerInterval) {
+    clearInterval(syncWorkerInterval);
+    syncWorkerInterval = null;
+    console.log('🛑 Worker de sincronización detenido');
+  }
+}
+
+function createWindow() {
+  const win = new BrowserWindow({
+    width: 1000,
+    height: 700,
+    webPreferences: {
+      preload: preloadPath,
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+    },
+    show: true,
+  });
+  mainWindow = win;
+  // Iniciar directamente en el Panel principal como antes
+  win.loadFile(path.join(__dirname, '..', 'Caja', 'panel.html'));
+}
+
+app.whenReady().then(async () => {
+  // Inicializar Health Monitor (primero, para monitorear todo)
+  try {
+    healthMonitor = getHealthMonitor();
+    console.log('✅ Health Monitor inicializado');
+
+    // Escuchar eventos de timeout y hangs
+    healthMonitor.on('timeout', (info) => {
+      console.error('🚨 [Health] TIMEOUT DETECTADO:', info);
+    });
+
+    healthMonitor.on('hang-detected', (hangs) => {
+      console.error('🚨 [Health] CUELGUES DETECTADOS:', hangs);
+    });
+  } catch (e) {
+    console.error('❌ No se pudo inicializar Health Monitor:', e.message);
+  }
+
+  // Inicializar Safe Operations wrappers
+  if (db && healthMonitor) {
+    safeDb = new SafeDatabaseOperations(db, healthMonitor);
+    console.log('✅ Safe Database Operations inicializado');
+  }
+
+  // Inicializar Supabase Manager (después de app.whenReady() para evitar errores)
+  try {
+    supabaseManager = getSupabaseManager();
+    const connected = await supabaseManager.testConnection();
+    if (connected) {
+      console.log('✅ Supabase Manager inicializado y conectado');
+    } else {
+      console.warn('⚠️  Supabase Manager inicializado pero sin conexión (modo offline)');
+    }
+
+    // Inicializar Safe Supabase Operations
+    if (supabaseManager && healthMonitor) {
+      safeSupabase = new SafeSupabaseOperations(supabaseManager, healthMonitor);
+      console.log('✅ Safe Supabase Operations inicializado');
+    }
+  } catch (e) {
+    console.warn('⚠️  No se pudo inicializar Supabase Manager:', e.message);
+  }
+
+  // Inicializar Printer Service (ahora que app.getPath está disponible)
+  try {
+    if (PrinterService) {
+      printer = new PrinterService();
+      // Aplicar perfil persistido si existe
+      const profilePath = path.join(app.getPath('userData'), 'printerProfile.json');
+      if (fs.existsSync(profilePath)) {
+        const raw = fs.readFileSync(profilePath, 'utf8');
+        const saved = JSON.parse(raw);
+        printer.setProfile?.(saved);
+      }
+      console.log('✅ Printer Service inicializado');
+    }
+  } catch (e) {
+    console.warn('⚠️  No se pudo inicializar Printer Service:', e.message);
+  }
+
+  // HANDLERS DUPLICADOS COMENTADOS - Los handlers generate-ticket, validate-voucher, redeem-voucher
+  // están definidos arriba con integración de Supabase. No registramos los handlers de src/main/ipc/
+  // para evitar sobrescribir los handlers que ya tienen Supabase integrado.
+
+  try {
+    // Solo registrar handlers de impresora (NO registrar ticketHandlers duplicados)
+    await tryRegisterPrinterOnly();
+
+    // COMENTADO: Evita duplicación de handlers y conflictos
+    // if (typeof registerIpcHandlers === 'function') {
+    //   await registerIpcHandlers({ db, printer });
+    // }
+  } catch (e) {
+    console.warn('Fallo al registrar handlers IPC:', e.message);
+  }
+
+  // Iniciar worker de sincronización automática
+  startSyncWorker();
+
+  // (Autorun reset de PINs eliminado tras validación del login)
+
+  createWindow();
+
+  app.on('activate', () => {
+    if (BrowserWindow.getAllWindows().length === 0) {
+      createWindow();
+    }
+  });
+});
+
+app.on('window-all-closed', () => {
+  if (process.platform !== 'darwin') app.quit();
+});
+
+app.on('before-quit', () => {
+  // Detener worker de sincronización al cerrar
+  stopSyncWorker();
+});

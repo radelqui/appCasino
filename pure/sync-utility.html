@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Sincronización Masiva - Utilidad</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #0b1220;
+      color: #e5e7eb;
+      padding: 20px;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    .card {
+      background: #0f172a;
+      border: 1px solid #1f2937;
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 20px;
+    }
+    h1 {
+      color: #60a5fa;
+      margin-top: 0;
+    }
+    button {
+      background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+    button:hover {
+      transform: scale(1.05);
+    }
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    #status {
+      margin-top: 20px;
+      padding: 16px;
+      background: #111827;
+      border-radius: 8px;
+      border-left: 4px solid #3b82f6;
+      white-space: pre-wrap;
+      font-family: 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      display: none;
+    }
+    #status.show {
+      display: block;
+    }
+    .warning {
+      background: #451a03;
+      border-left-color: #f59e0b;
+      padding: 16px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+    }
+    .success {
+      background: #064e3b;
+      border-left-color: #10b981;
+    }
+    .error {
+      background: #450a0a;
+      border-left-color: #ef4444;
+    }
+    .progress {
+      margin-top: 12px;
+      height: 8px;
+      background: #1f2937;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .progress-bar {
+      height: 100%;
+      background: linear-gradient(90deg, #3b82f6, #10b981);
+      width: 0%;
+      transition: width 0.5s;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>🔄 Sincronización Masiva de Tickets</h1>
+    <p>Esta utilidad sincronizará todos los tickets pendientes de SQLite a Supabase.</p>
+
+    <div class="warning">
+      <strong>⚠️ ADVERTENCIA:</strong>
+      <ul>
+        <li>Este proceso puede tomar varios minutos</li>
+        <li>Se sincronizarán TODOS los tickets marcados como no sincronizados</li>
+        <li>Los tickets duplicados se actualizarán en lugar de insertarse</li>
+        <li>No cierre esta ventana durante el proceso</li>
+      </ul>
+    </div>
+
+    <button id="btn-sync" onclick="startSync()">
+      🚀 Iniciar Sincronización
+    </button>
+
+    <button id="btn-close" onclick="cerrar()" style="margin-left: 12px; background: #1f2937;">
+      ← Cerrar
+    </button>
+
+    <div id="status"></div>
+  </div>
+
+  <script>
+    const statusEl = document.getElementById('status');
+    const btnSync = document.getElementById('btn-sync');
+
+    function showStatus(message, type = 'info') {
+      statusEl.textContent = message;
+      statusEl.className = `show ${type}`;
+    }
+
+    async function startSync() {
+      try {
+        // Deshabilitar botón
+        btnSync.disabled = true;
+        btnSync.textContent = '⏳ Sincronizando...';
+
+        showStatus('🚀 Iniciando sincronización masiva...\nPor favor espere...', 'info');
+
+        // Llamar al handler
+        const result = await window.api.invoke('sync-all-pending');
+
+        if (result.success) {
+          const summary = `
+✅ SINCRONIZACIÓN COMPLETADA
+
+════════════════════════════════════════════════════════════
+
+📊 RESUMEN:
+   Total procesados: ${result.total}
+   ✅ Exitosos: ${result.synced}
+   ❌ Fallidos: ${result.failed}
+   📈 Tasa de éxito: ${((result.synced / result.total) * 100).toFixed(1)}%
+
+${result.errors && result.errors.length > 0 ? `
+❌ ERRORES (primeros 10):
+${result.errors.map(e => `   - ${e.code}: ${e.error}`).join('\n')}
+` : ''}
+════════════════════════════════════════════════════════════
+
+✅ Todos los tickets han sido procesados.
+Puede cerrar esta ventana.
+          `;
+          showStatus(summary, 'success');
+        } else {
+          showStatus(`❌ ERROR EN SINCRONIZACIÓN:\n\n${result.error}\n\nPor favor, verifique la consola para más detalles.`, 'error');
+        }
+
+        // Rehabilitar botón
+        btnSync.disabled = false;
+        btnSync.textContent = '🔄 Sincronizar Nuevamente';
+
+      } catch (error) {
+        console.error('❌ Error:', error);
+        showStatus(`❌ ERROR CRÍTICO:\n\n${error.message}\n\nPor favor, verifique la consola para más detalles.`, 'error');
+
+        btnSync.disabled = false;
+        btnSync.textContent = '🔄 Reintentar';
+      }
+    }
+
+    async function cerrar() {
+      try {
+        await window.api?.closeCurrent?.();
+      } catch (_) {
+        try {
+          window.close();
+        } catch {}
+      }
+    }
+
+    // Verificar API disponible
+    if (!window.api || !window.api.invoke) {
+      showStatus('❌ ERROR: API de Electron no disponible.\nEsta página debe ejecutarse dentro de la aplicación Electron.', 'error');
+      btnSync.disabled = true;
+    }
+  </script>
+</body>
+</html>

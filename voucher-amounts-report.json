@@ -1,0 +1,39 @@
+{
+  "timestamp": "2025-10-31T23:59:46.507Z",
+  "structure": {},
+  "amount_ranges": {
+    "USD": {
+      "count": 15,
+      "min": 20,
+      "max": 1000,
+      "avg": 299.6666666666667
+    },
+    "DOP": {
+      "count": 25,
+      "min": 10,
+      "max": 600,
+      "avg": 209.84199999999998
+    }
+  },
+  "tests": {
+    "passed": 8,
+    "failed": 0,
+    "total": 8
+  },
+  "performance": {
+    "query_with_limits": {
+      "time_ms": 88,
+      "results": 10,
+      "status": "✅ RÁPIDO"
+    }
+  },
+  "recommendations": [
+    "Hay vouchers DOP con monto menor a $50 (mínimo: $10)"
+  ],
+  "summary": {
+    "total": 48,
+    "active": 28,
+    "redeemed": 20,
+    "redemption_rate": "41.67%"
+  }
+}

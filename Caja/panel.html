@@ -129,7 +129,7 @@
 
         .mesa-card { --card-color: #28a745; }
         .caja-card { --card-color: #dc3545; }
-        .auditoria-card { --card-color: #ffc107; }
+        .reportes-card { --card-color: #ffc107; }
         .config-card { --card-color: #17a2b8; }
 
         /* Estado deshabilitado por rol */
@@ -290,15 +290,15 @@
                 <button class="card-button">Abrir Caja</button>
             </div>
 
-            <!-- Auditoría -->
-            <div class="card auditoria-card" onclick="openView('auditoria')">
-                <div class="card-icon">📊</div>
-                <div class="card-title">AUDITORÍA</div>
+            <!-- Reportes -->
+            <div class="card reportes-card" onclick="openView('reportes')">
+                <div class="card-icon">📈</div>
+                <div class="card-title">REPORTES</div>
                 <div class="card-description">
-                    Reportes, estadísticas, historial de transacciones,
-                    exportación de datos.
+                    Generar reportes y estadísticas,
+                    exportación a Excel y PDF.
                 </div>
-                <button class="card-button">Abrir Auditoría</button>
+                <button class="card-button">Abrir Reportes</button>
             </div>
 
             <!-- Configuración -->
@@ -377,7 +377,7 @@
                 alert('Acceso restringido: solo Caja o Admin');
                 return;
             }
-            if (view === 'auditoria' && !(role === 'AUDITOR' || role === 'ADMIN')) {
+            if (view === 'reportes' && !(role === 'AUDITOR' || role === 'ADMIN')) {
                 alert('Acceso restringido: solo Auditor o Admin');
                 return;
             }
@@ -393,8 +393,8 @@
                     // Pedimos al main abrir la ventana de Caja (preload específico y validación de DB)
                     window.api?.openView?.('caja');
                     break;
-                case 'auditoria':
-                    window.api?.openView?.('auditoria');
+                case 'reportes':
+                    window.api?.openView?.('reportes');
                     break;
                 case 'config':
                     window.api?.openView?.('config');
@@ -413,7 +413,7 @@
                         openView('caja');
                         break;
                     case 'a':
-                        openView('auditoria');
+                        openView('reportes');
                         break;
                 }
             }
@@ -424,10 +424,10 @@
             try {
                 const role = String(await (window.api?.getRole?.() || Promise.resolve('MESA'))).toUpperCase();
                 const cajaCard = document.querySelector('.caja-card');
-                const auditoriaCard = document.querySelector('.auditoria-card');
+                const reportesCard = document.querySelector('.reportes-card');
                 const configCard = document.querySelector('.config-card');
                 cajaCard?.classList.toggle('disabled', !(role === 'CAJA' || role === 'ADMIN'));
-                auditoriaCard?.classList.toggle('disabled', !(role === 'AUDITOR' || role === 'ADMIN'));
+                reportesCard?.classList.toggle('disabled', !(role === 'AUDITOR' || role === 'ADMIN'));
                 configCard?.classList.toggle('disabled', !(role === 'ADMIN'));
                 // Privacidad: ocultar barra de estado a no auditores/admin
                 const statusBar = document.querySelector('.status-bar');

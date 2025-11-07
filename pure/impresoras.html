@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Configuración de Impresoras</title>
+  <style>
+    /* Estilos consistentes con config.html */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+      background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 12px;
+      padding: 30px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 30px;
+      padding-bottom: 20px;
+      border-bottom: 2px solid #e2e8f0;
+    }
+
+    h1 {
+      font-size: 28px;
+      color: #1e293b;
+      margin-bottom: 8px;
+    }
+
+    .subtitle {
+      color: #64748b;
+      font-size: 14px;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      font-size: 14px;
+      transition: all 0.2s;
+      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
+    }
+
+    .btn-primary:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .btn-secondary {
+      background: white;
+      color: #475569;
+      border: 2px solid #cbd5e1;
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      font-size: 14px;
+      transition: all 0.2s;
+    }
+
+    .btn-secondary:hover {
+      background: #f8fafc;
+      border-color: #94a3b8;
+    }
+
+    .action-bar {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .printer-card {
+      background: #f8fafc;
+      padding: 20px;
+      border-radius: 8px;
+      margin-bottom: 15px;
+      border-left: 4px solid #3b82f6;
+      transition: all 0.2s;
+    }
+
+    .printer-card:hover {
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      transform: translateX(4px);
+    }
+
+    .printer-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .printer-info h3 {
+      margin: 0 0 5px 0;
+      color: #1e293b;
+      font-size: 18px;
+    }
+
+    .printer-info p {
+      margin: 0;
+      color: #64748b;
+      font-size: 13px;
+    }
+
+    .printer-actions {
+      display: flex;
+      gap: 10px;
+    }
+
+    .status-badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 600;
+      margin-top: 8px;
+    }
+
+    .status-online {
+      background: #dcfce7;
+      color: #166534;
+    }
+
+    .status-offline {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: #64748b;
+    }
+
+    .empty-state-icon {
+      font-size: 64px;
+      margin-bottom: 16px;
+      opacity: 0.5;
+    }
+
+    /* Modal */
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.5);
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+
+    .modal-content {
+      background: white;
+      border-radius: 12px;
+      padding: 30px;
+      max-width: 500px;
+      width: 90%;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+
+    .modal-content h2 {
+      margin-bottom: 20px;
+      color: #1e293b;
+    }
+
+    .modal-content label {
+      display: block;
+      margin-bottom: 8px;
+      color: #475569;
+      font-weight: 600;
+      font-size: 14px;
+    }
+
+    .modal-content select,
+    .modal-content input[type="text"] {
+      width: 100%;
+      padding: 10px;
+      border: 2px solid #cbd5e1;
+      border-radius: 8px;
+      font-size: 14px;
+      margin-bottom: 16px;
+      transition: all 0.2s;
+    }
+
+    .modal-content select:focus,
+    .modal-content input[type="text"]:focus {
+      outline: none;
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+
+    .checkbox-wrapper {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 20px;
+    }
+
+    .checkbox-wrapper input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      cursor: pointer;
+    }
+
+    .checkbox-wrapper label {
+      margin: 0;
+      cursor: pointer;
+    }
+
+    .modal-buttons {
+      display: flex;
+      gap: 12px;
+      justify-content: flex-end;
+      margin-top: 20px;
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+      margin-right: 8px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div>
+        <h1>🖨️ Configuración de Impresoras</h1>
+        <p class="subtitle">Detectar y configurar impresoras del sistema</p>
+      </div>
+      <button onclick="volverConfig()" class="btn-secondary">← Volver</button>
+    </div>
+
+    <!-- Botones de acción -->
+    <div class="action-bar">
+      <button id="btn-detectar" onclick="detectarImpresoras()" class="btn-primary">
+        🔍 Detectar Impresoras
+      </button>
+      <button onclick="probarImpresion()" class="btn-secondary">
+        🧪 Probar Impresión
+      </button>
+    </div>
+
+    <!-- Lista de impresoras -->
+    <div id="lista-impresoras">
+      <div class="empty-state">
+        <div class="empty-state-icon">🖨️</div>
+        <p>Haz clic en "Detectar Impresoras" para buscar impresoras instaladas</p>
+      </div>
+    </div>
+
+    <!-- Modal configurar -->
+    <div id="modal-config" class="modal">
+      <div class="modal-content">
+        <h2>⚙️ Configurar Impresora</h2>
+        <form id="form-impresora" onsubmit="guardarConfig(event)">
+          <input type="hidden" id="printer-name">
+
+          <label for="printer-type">Tipo de impresora:</label>
+          <select id="printer-type" required>
+            <option value="thermal">Térmica (ESC/POS)</option>
+            <option value="pdf">PDF (Sistema)</option>
+          </select>
+
+          <label for="paper-width">Ancho de papel:</label>
+          <select id="paper-width" required>
+            <option value="80">80mm (estándar)</option>
+            <option value="58">58mm (compacta)</option>
+          </select>
+
+          <div class="checkbox-wrapper">
+            <input type="checkbox" id="set-default">
+            <label for="set-default">Usar como impresora predeterminada</label>
+          </div>
+
+          <div class="modal-buttons">
+            <button type="button" onclick="cerrarModal()" class="btn-secondary">Cancelar</button>
+            <button type="submit" class="btn-primary">Guardar</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let impresoras = [];
+
+    async function detectarImpresoras() {
+      const btn = document.getElementById('btn-detectar');
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span> Detectando...';
+
+      try {
+        const result = await window.api.invoke('printer:detect');
+
+        if (result.success) {
+          impresoras = result.printers;
+          mostrarImpresoras();
+          btn.innerHTML = `✅ ${impresoras.length} encontrada${impresoras.length !== 1 ? 's' : ''}`;
+
+          setTimeout(() => {
+            btn.innerHTML = '🔍 Detectar Impresoras';
+            btn.disabled = false;
+          }, 2000);
+        } else {
+          throw new Error(result.error);
+        }
+      } catch (error) {
+        console.error('Error detectando impresoras:', error);
+        alert('❌ Error detectando impresoras: ' + error.message);
+        btn.innerHTML = '❌ Error';
+
+        setTimeout(() => {
+          btn.innerHTML = '🔍 Detectar Impresoras';
+          btn.disabled = false;
+        }, 2000);
+      }
+    }
+
+    function mostrarImpresoras() {
+      const container = document.getElementById('lista-impresoras');
+      container.innerHTML = '';
+
+      if (impresoras.length === 0) {
+        container.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-state-icon">😕</div>
+            <p>No se encontraron impresoras instaladas en el sistema</p>
+          </div>
+        `;
+        return;
+      }
+
+      impresoras.forEach(printer => {
+        const div = document.createElement('div');
+        div.className = 'printer-card';
+        div.innerHTML = `
+          <div class="printer-header">
+            <div class="printer-info">
+              <h3>🖨️ ${escapeHtml(printer.name)}</h3>
+              <p>${escapeHtml(printer.description || 'Sin descripción')}</p>
+              <span class="status-badge status-${printer.isDefault ? 'online' : 'offline'}">
+                ${printer.isDefault ? '✅ Predeterminada' : '📍 Disponible'}
+              </span>
+            </div>
+            <div class="printer-actions">
+              <button onclick="configurarImpresora('${escapeHtml(printer.name)}')" class="btn-primary" style="margin-right: 10px;">
+                ⚙️ Configurar
+              </button>
+              <button onclick="establecerPredeterminada('${escapeHtml(printer.name)}')" class="btn-secondary">
+                ⭐ Usar
+              </button>
+            </div>
+          </div>
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    async function configurarImpresora(name) {
+      document.getElementById('printer-name').value = name;
+      document.getElementById('modal-config').style.display = 'flex';
+
+      // Cargar config actual si existe
+      try {
+        const config = await window.api.invoke('printer:get-config', name);
+        if (config.success) {
+          document.getElementById('printer-type').value = config.type || 'thermal';
+          document.getElementById('paper-width').value = String(config.width || '80');
+          document.getElementById('set-default').checked = config.isDefault || false;
+        }
+      } catch (error) {
+        console.error('Error cargando configuración:', error);
+      }
+    }
+
+    async function guardarConfig(event) {
+      event.preventDefault();
+
+      const config = {
+        name: document.getElementById('printer-name').value,
+        type: document.getElementById('printer-type').value,
+        width: parseInt(document.getElementById('paper-width').value),
+        isDefault: document.getElementById('set-default').checked
+      };
+
+      try {
+        const result = await window.api.invoke('printer:save-config', config);
+
+        if (result.success) {
+          alert('✅ Configuración guardada correctamente');
+          cerrarModal();
+          detectarImpresoras();
+        } else {
+          throw new Error(result.error);
+        }
+      } catch (error) {
+        console.error('Error guardando configuración:', error);
+        alert('❌ Error: ' + error.message);
+      }
+    }
+
+    async function establecerPredeterminada(name) {
+      try {
+        const result = await window.api.invoke('printer:set-default', name);
+        if (result.success) {
+          alert('✅ Impresora predeterminada establecida');
+          detectarImpresoras();
+        } else {
+          throw new Error(result.error);
+        }
+      } catch (error) {
+        console.error('Error estableciendo predeterminada:', error);
+        alert('❌ Error: ' + error.message);
+      }
+    }
+
+    async function probarImpresion() {
+      if (impresoras.length === 0) {
+        alert('⚠️ Primero debes detectar impresoras');
+        return;
+      }
+
+      if (!confirm('¿Deseas imprimir un ticket de prueba en la impresora predeterminada?')) {
+        return;
+      }
+
+      try {
+        const result = await window.api.invoke('printer:test-print');
+        if (result.success) {
+          alert('✅ Ticket de prueba enviado a impresora');
+        } else {
+          throw new Error(result.error);
+        }
+      } catch (error) {
+        console.error('Error en prueba de impresión:', error);
+        alert('❌ Error: ' + error.message);
+      }
+    }
+
+    function cerrarModal() {
+      document.getElementById('modal-config').style.display = 'none';
+    }
+
+    function volverConfig() {
+      window.api.invoke('open-view', 'config');
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    // Cerrar modal con ESC
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        cerrarModal();
+      }
+    });
+
+    // Detectar al cargar (opcional, comentado para que el usuario lo haga manualmente)
+    // detectarImpresoras();
+  </script>
+</body>
+</html>

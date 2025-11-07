@@ -1,0 +1,1034 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Logs del Sistema</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1600px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      overflow: hidden;
+    }
+
+    .header {
+      background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
+      color: white;
+      padding: 30px 40px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 20px;
+    }
+
+    .header-title {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+    }
+
+    .icon {
+      font-size: 40px;
+    }
+
+    .header h1 {
+      font-size: 28px;
+      font-weight: 700;
+      margin-bottom: 5px;
+    }
+
+    .header p {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .content {
+      padding: 30px 40px;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 20px;
+      margin-bottom: 30px;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+      padding: 24px;
+      border-radius: 12px;
+      border-left: 4px solid #3b82f6;
+      transition: transform 0.2s;
+    }
+
+    .stat-card:hover {
+      transform: translateY(-2px);
+    }
+
+    .stat-card.green {
+      background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+      border-left-color: #10b981;
+    }
+
+    .stat-card.red {
+      background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
+      border-left-color: #ef4444;
+    }
+
+    .stat-card.purple {
+      background: linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%);
+      border-left-color: #a855f7;
+    }
+
+    .stat-value {
+      font-size: 36px;
+      font-weight: 800;
+      color: #1e40af;
+      margin-bottom: 8px;
+    }
+
+    .stat-card.green .stat-value {
+      color: #047857;
+    }
+
+    .stat-card.red .stat-value {
+      color: #dc2626;
+    }
+
+    .stat-card.purple .stat-value {
+      color: #7c3aed;
+    }
+
+    .stat-label {
+      font-size: 13px;
+      color: #64748b;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .filters-section {
+      background: #f8fafc;
+      padding: 25px;
+      border-radius: 12px;
+      margin-bottom: 25px;
+      border: 1px solid #e2e8f0;
+    }
+
+    .filters-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+    }
+
+    .filter-group {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .filter-group label {
+      font-size: 12px;
+      font-weight: 600;
+      color: #475569;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .filter-group input,
+    .filter-group select {
+      padding: 10px 14px;
+      border: 2px solid #e2e8f0;
+      border-radius: 8px;
+      font-size: 14px;
+      background: white;
+      transition: border-color 0.3s;
+    }
+
+    .filter-group input:focus,
+    .filter-group select:focus {
+      outline: none;
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+
+    .btn {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(59, 130, 246, 0.4);
+    }
+
+    .btn-secondary {
+      background: white;
+      color: #3b82f6;
+      border: 2px solid #3b82f6;
+    }
+
+    .btn-secondary:hover {
+      background: #3b82f6;
+      color: white;
+    }
+
+    .btn-small {
+      padding: 6px 12px;
+      font-size: 13px;
+    }
+
+    .table-container {
+      overflow-x: auto;
+      border-radius: 12px;
+      border: 1px solid #e5e7eb;
+      margin-top: 20px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: white;
+    }
+
+    thead {
+      background: #f9fafb;
+      border-bottom: 2px solid #e5e7eb;
+      position: sticky;
+      top: 0;
+    }
+
+    th {
+      padding: 16px 12px;
+      text-align: left;
+      font-weight: 600;
+      color: #374151;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    td {
+      padding: 14px 12px;
+      border-bottom: 1px solid #f3f4f6;
+      font-size: 14px;
+      color: #1f2937;
+    }
+
+    tbody tr {
+      transition: background-color 0.2s;
+    }
+
+    tbody tr:hover {
+      background: #f9fafb;
+    }
+
+    .event-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      white-space: nowrap;
+    }
+
+    .event-voucher_issued {
+      background: #dbeafe;
+      color: #1e40af;
+      border: 1px solid #93c5fd;
+    }
+
+    .event-voucher_redeemed {
+      background: #dcfce7;
+      color: #166534;
+      border: 1px solid #86efac;
+    }
+
+    .event-voucher_cancelled {
+      background: #fee2e2;
+      color: #991b1b;
+      border: 1px solid #fca5a5;
+    }
+
+    .event-user_login {
+      background: #f3e8ff;
+      color: #6b21a8;
+      border: 1px solid #d8b4fe;
+    }
+
+    .event-user_created {
+      background: #fef3c7;
+      color: #92400e;
+      border: 1px solid #fde047;
+    }
+
+    .event-config_changed {
+      background: #fecaca;
+      color: #7f1d1d;
+      border: 1px solid #fca5a5;
+    }
+
+    .event-default {
+      background: #f1f5f9;
+      color: #475569;
+      border: 1px solid #cbd5e1;
+    }
+
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.6);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(4px);
+    }
+
+    .modal-content {
+      background: white;
+      border-radius: 16px;
+      padding: 0;
+      width: 90%;
+      max-width: 700px;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      animation: modalSlideIn 0.3s ease-out;
+    }
+
+    @keyframes modalSlideIn {
+      from {
+        transform: translateY(-50px);
+        opacity: 0;
+      }
+      to {
+        transform: translateY(0);
+        opacity: 1;
+      }
+    }
+
+    .modal-header {
+      background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
+      color: white;
+      padding: 24px 30px;
+      border-radius: 16px 16px 0 0;
+    }
+
+    .modal-header h2 {
+      font-size: 22px;
+      font-weight: 700;
+      margin: 0;
+    }
+
+    .modal-body {
+      padding: 30px;
+    }
+
+    .detail-row {
+      display: flex;
+      padding: 12px 0;
+      border-bottom: 1px solid #f1f5f9;
+    }
+
+    .detail-label {
+      font-weight: 600;
+      color: #64748b;
+      width: 140px;
+      flex-shrink: 0;
+    }
+
+    .detail-value {
+      color: #1f2937;
+      word-break: break-all;
+    }
+
+    .json-viewer {
+      background: #1e293b;
+      color: #e2e8f0;
+      padding: 20px;
+      border-radius: 8px;
+      font-family: 'Courier New', 'Consolas', monospace;
+      font-size: 13px;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      line-height: 1.6;
+      margin-top: 15px;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 80px 20px;
+      color: #6b7280;
+    }
+
+    .empty-state .icon {
+      font-size: 64px;
+      margin-bottom: 16px;
+      opacity: 0.5;
+    }
+
+    .empty-state h3 {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: #374151;
+    }
+
+    .empty-state p {
+      font-size: 14px;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: #6b7280;
+    }
+
+    .spinner {
+      border: 3px solid #f3f4f6;
+      border-top: 3px solid #3b82f6;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 15px;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    /* Responsive */
+    @media (max-width: 1024px) {
+      .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .filters-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .header {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .content {
+        padding: 20px;
+      }
+
+      .stats-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .table-container {
+        font-size: 12px;
+      }
+
+      th, td {
+        padding: 10px 8px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="header-title">
+        <span class="icon">📊</span>
+        <div>
+          <h1>Logs del Sistema</h1>
+          <p>Historial completo de eventos y acciones • <span id="ultima-actualizacion">Cargando...</span></p>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button onclick="actualizarLogs()" class="btn btn-primary">
+          🔄 Actualizar
+        </button>
+        <button onclick="exportarLogs()" class="btn btn-secondary">
+          📥 Exportar CSV
+        </button>
+        <button onclick="volverConfig()" class="btn btn-secondary">
+          ← Volver
+        </button>
+      </div>
+    </div>
+
+    <div class="content">
+      <!-- Estadísticas -->
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-value" id="stat-total">0</div>
+          <div class="stat-label">Total eventos hoy</div>
+        </div>
+        <div class="stat-card green">
+          <div class="stat-value" id="stat-emitidos">0</div>
+          <div class="stat-label">Tickets emitidos hoy</div>
+        </div>
+        <div class="stat-card red">
+          <div class="stat-value" id="stat-canjeados">0</div>
+          <div class="stat-label">Tickets canjeados hoy</div>
+        </div>
+        <div class="stat-card purple">
+          <div class="stat-value" id="stat-usuarios">0</div>
+          <div class="stat-label">Usuarios activos hoy</div>
+        </div>
+      </div>
+
+      <!-- Filtros -->
+      <div class="filters-section">
+        <div class="filters-grid">
+          <div class="filter-group">
+            <label>Desde:</label>
+            <input type="date" id="fecha-desde" onchange="filtrarLogs()">
+          </div>
+          <div class="filter-group">
+            <label>Hasta:</label>
+            <input type="date" id="fecha-hasta" onchange="filtrarLogs()">
+          </div>
+          <div class="filter-group">
+            <label>Tipo de evento:</label>
+            <select id="filtro-tipo" onchange="filtrarLogs()">
+              <option value="">Todos los eventos</option>
+              <option value="voucher_issued">🎫 Emisión de tickets</option>
+              <option value="voucher_redeemed">✅ Canje de tickets</option>
+              <option value="voucher_cancelled">❌ Cancelación</option>
+              <option value="user_login">🔐 Login de usuarios</option>
+              <option value="user_created">👤 Creación de usuarios</option>
+              <option value="config_changed">⚙️ Cambios de configuración</option>
+            </select>
+          </div>
+          <div class="filter-group">
+            <label>Usuario:</label>
+            <select id="filtro-usuario" onchange="filtrarLogs()">
+              <option value="">Todos los usuarios</option>
+            </select>
+          </div>
+          <div class="filter-group">
+            <label>Estación:</label>
+            <select id="filtro-estacion" onchange="filtrarLogs()">
+              <option value="">Todas las estaciones</option>
+            </select>
+          </div>
+          <div class="filter-group">
+            <label>Buscar:</label>
+            <input type="text" id="busqueda" placeholder="Código, email, detalles..." onkeyup="filtrarLogs()">
+          </div>
+        </div>
+      </div>
+
+      <!-- Tabla -->
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>Fecha/Hora</th>
+              <th>Tipo de Evento</th>
+              <th>Usuario</th>
+              <th>Estación</th>
+              <th>Detalles</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="tabla-logs">
+            <tr>
+              <td colspan="6">
+                <div class="loading">
+                  <div class="spinner"></div>
+                  <p>Cargando logs del sistema...</p>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Detalles -->
+  <div id="modal-detalles" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>📋 Detalles del Evento</h2>
+      </div>
+      <div class="modal-body">
+        <div id="detalles-contenido"></div>
+        <button onclick="cerrarModal()" class="btn btn-secondary" style="margin-top: 25px; width: 100%;">
+          Cerrar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let logs = [];
+    let usuarios = {};
+    let estaciones = {};
+
+    // ============================================
+    // INICIALIZACIÓN
+    // ============================================
+    async function init() {
+      console.log('🚀 Inicializando módulo de logs...');
+
+      // Establecer fecha de hoy por defecto
+      const hoy = new Date().toISOString().split('T')[0];
+      document.getElementById('fecha-desde').value = hoy;
+      document.getElementById('fecha-hasta').value = hoy;
+
+      // Cargar datos
+      await Promise.all([
+        cargarUsuarios(),
+        cargarEstaciones()
+      ]);
+
+      await cargarLogs();
+    }
+
+    // ============================================
+    // CARGA DE DATOS
+    // ============================================
+    async function cargarUsuarios() {
+      try {
+        const result = await window.api.invoke('get-all-users');
+
+        if (result.success) {
+          result.users.forEach(u => {
+            usuarios[u.id] = u.full_name || u.email;
+          });
+
+          const select = document.getElementById('filtro-usuario');
+          result.users.forEach(u => {
+            const option = document.createElement('option');
+            option.value = u.id;
+            option.textContent = u.full_name || u.email;
+            select.appendChild(option);
+          });
+
+          console.log('✅ Usuarios cargados:', Object.keys(usuarios).length);
+        }
+      } catch (error) {
+        console.error('❌ Error cargando usuarios:', error);
+      }
+    }
+
+    async function cargarEstaciones() {
+      try {
+        // Datos por defecto de estaciones
+        estaciones = {
+          1: 'Mesa Principal 1',
+          2: 'Mesa Principal 2',
+          3: 'Mesa Principal 3',
+          4: 'Mesa Principal 4',
+          5: 'Caja Central'
+        };
+
+        const select = document.getElementById('filtro-estacion');
+        Object.entries(estaciones).forEach(([id, nombre]) => {
+          const option = document.createElement('option');
+          option.value = id;
+          option.textContent = nombre;
+          select.appendChild(option);
+        });
+
+        console.log('✅ Estaciones cargadas:', Object.keys(estaciones).length);
+      } catch (error) {
+        console.error('❌ Error cargando estaciones:', error);
+      }
+    }
+
+    async function cargarLogs() {
+      try {
+        console.log('📥 Cargando logs...');
+
+        const filtros = {
+          desde: document.getElementById('fecha-desde').value,
+          hasta: document.getElementById('fecha-hasta').value,
+          tipo: document.getElementById('filtro-tipo').value,
+          usuario: document.getElementById('filtro-usuario').value,
+          estacion: document.getElementById('filtro-estacion').value
+        };
+
+        console.log('🔍 Filtros:', filtros);
+
+        const result = await window.api.invoke('get-audit-logs', filtros);
+
+        if (result.success) {
+          logs = result.logs || [];
+          console.log('✅ Logs cargados:', logs.length);
+          mostrarLogs();
+          calcularEstadisticas();
+          actualizarUltimaActualizacion();
+        } else {
+          console.error('❌ Error:', result.error);
+          mostrarError('Error cargando logs: ' + result.error);
+        }
+      } catch (error) {
+        console.error('❌ Error crítico:', error);
+        mostrarError('Error crítico: ' + error.message);
+      }
+    }
+
+    // ============================================
+    // RENDERIZADO
+    // ============================================
+    function mostrarLogs() {
+      const tbody = document.getElementById('tabla-logs');
+      tbody.innerHTML = '';
+
+      const busqueda = document.getElementById('busqueda').value.toLowerCase();
+
+      let logsFiltrados = logs;
+      if (busqueda) {
+        logsFiltrados = logs.filter(log =>
+          JSON.stringify(log).toLowerCase().includes(busqueda)
+        );
+      }
+
+      if (logsFiltrados.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="6">
+              <div class="empty-state">
+                <div class="icon">📭</div>
+                <h3>No se encontraron logs</h3>
+                <p>No hay eventos que coincidan con los filtros seleccionados</p>
+              </div>
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      logsFiltrados.forEach(log => {
+        const tr = document.createElement('tr');
+
+        const fecha = new Date(log.created_at);
+        const fechaStr = fecha.toLocaleDateString('es-DO', {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit'
+        });
+        const horaStr = fecha.toLocaleTimeString('es-DO', {
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit'
+        });
+
+        tr.innerHTML = `
+          <td>
+            <div style="white-space: nowrap;">
+              <div style="font-weight: 600;">${fechaStr}</div>
+              <div style="font-size: 12px; color: #6b7280;">${horaStr}</div>
+            </div>
+          </td>
+          <td>
+            <span class="event-badge event-${log.event_type}">
+              ${getEventIcon(log.event_type)} ${getEventName(log.event_type)}
+            </span>
+          </td>
+          <td>${usuarios[log.user_id] || 'Sistema'}</td>
+          <td>${estaciones[log.station_id] || '-'}</td>
+          <td>${getDetallesResumen(log)}</td>
+          <td>
+            <button class="btn btn-primary btn-small" onclick='verDetalles(${JSON.stringify(log).replace(/'/g, "&apos;")})'>
+              👁️ Ver más
+            </button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      console.log('📊 Mostrando', logsFiltrados.length, 'de', logs.length, 'logs');
+    }
+
+    // ============================================
+    // UTILIDADES DE EVENTOS
+    // ============================================
+    function getEventIcon(tipo) {
+      const icons = {
+        voucher_issued: '🎫',
+        voucher_redeemed: '✅',
+        voucher_cancelled: '❌',
+        user_login: '🔐',
+        user_logout: '🚪',
+        user_created: '👤',
+        user_updated: '✏️',
+        user_deleted: '🗑️',
+        config_changed: '⚙️',
+        system_error: '🔴',
+        system_warning: '⚠️'
+      };
+      return icons[tipo] || '📝';
+    }
+
+    function getEventName(tipo) {
+      const names = {
+        voucher_issued: 'Ticket Emitido',
+        voucher_redeemed: 'Ticket Canjeado',
+        voucher_cancelled: 'Cancelado',
+        user_login: 'Login',
+        user_logout: 'Logout',
+        user_created: 'Usuario Creado',
+        user_updated: 'Usuario Actualizado',
+        user_deleted: 'Usuario Eliminado',
+        config_changed: 'Config. Cambiada',
+        system_error: 'Error Sistema',
+        system_warning: 'Advertencia'
+      };
+      return names[tipo] || tipo;
+    }
+
+    function getDetallesResumen(log) {
+      if (!log.details) return '-';
+
+      const d = log.details;
+
+      if (d.voucher_code) {
+        const amount = d.amount ? `${d.currency || 'DOP'} ${d.amount}` : '';
+        return `Ticket: ${d.voucher_code} ${amount}`;
+      }
+
+      if (d.email) return `Email: ${d.email}`;
+      if (d.config_key) return `Config: ${d.config_key}`;
+      if (d.message) return d.message.substring(0, 50) + (d.message.length > 50 ? '...' : '');
+
+      return '-';
+    }
+
+    // ============================================
+    // MODAL DETALLES
+    // ============================================
+    function verDetalles(log) {
+      const contenido = document.getElementById('detalles-contenido');
+
+      const fecha = new Date(log.created_at).toLocaleString('es-DO', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      });
+
+      contenido.innerHTML = `
+        <div class="detail-row">
+          <div class="detail-label">ID del evento:</div>
+          <div class="detail-value"><code>${log.id}</code></div>
+        </div>
+        <div class="detail-row">
+          <div class="detail-label">Tipo:</div>
+          <div class="detail-value">
+            <span class="event-badge event-${log.event_type}">
+              ${getEventIcon(log.event_type)} ${getEventName(log.event_type)}
+            </span>
+          </div>
+        </div>
+        <div class="detail-row">
+          <div class="detail-label">Fecha y hora:</div>
+          <div class="detail-value">${fecha}</div>
+        </div>
+        <div class="detail-row">
+          <div class="detail-label">Usuario:</div>
+          <div class="detail-value">${usuarios[log.user_id] || 'Sistema'} ${log.user_id ? `<code>(${log.user_id})</code>` : ''}</div>
+        </div>
+        <div class="detail-row">
+          <div class="detail-label">Estación:</div>
+          <div class="detail-value">${estaciones[log.station_id] || '-'} ${log.station_id ? `<code>(ID: ${log.station_id})</code>` : ''}</div>
+        </div>
+        ${log.voucher_id ? `
+        <div class="detail-row">
+          <div class="detail-label">Voucher ID:</div>
+          <div class="detail-value"><code>${log.voucher_id}</code></div>
+        </div>
+        ` : ''}
+        ${log.ip_address ? `
+        <div class="detail-row">
+          <div class="detail-label">Dirección IP:</div>
+          <div class="detail-value"><code>${log.ip_address}</code></div>
+        </div>
+        ` : ''}
+        <div style="margin-top: 20px;">
+          <div class="detail-label" style="margin-bottom: 10px;">Detalles completos (JSON):</div>
+          <div class="json-viewer">${JSON.stringify(log.details || {}, null, 2)}</div>
+        </div>
+      `;
+
+      document.getElementById('modal-detalles').style.display = 'flex';
+    }
+
+    function cerrarModal() {
+      document.getElementById('modal-detalles').style.display = 'none';
+    }
+
+    // ============================================
+    // ESTADÍSTICAS
+    // ============================================
+    function calcularEstadisticas() {
+      const hoy = new Date().toDateString();
+      const logsHoy = logs.filter(log => new Date(log.created_at).toDateString() === hoy);
+
+      document.getElementById('stat-total').textContent = logsHoy.length;
+      document.getElementById('stat-emitidos').textContent = logsHoy.filter(l => l.event_type === 'voucher_issued').length;
+      document.getElementById('stat-canjeados').textContent = logsHoy.filter(l => l.event_type === 'voucher_redeemed').length;
+
+      const usuariosUnicos = new Set(logsHoy.filter(l => l.event_type === 'user_login').map(l => l.user_id));
+      document.getElementById('stat-usuarios').textContent = usuariosUnicos.size;
+
+      console.log('📊 Estadísticas calculadas:', {
+        total: logsHoy.length,
+        emitidos: logsHoy.filter(l => l.event_type === 'voucher_issued').length,
+        canjeados: logsHoy.filter(l => l.event_type === 'voucher_redeemed').length,
+        usuarios: usuariosUnicos.size
+      });
+    }
+
+    // ============================================
+    // EXPORTAR
+    // ============================================
+    function exportarLogs() {
+      if (logs.length === 0) {
+        alert('No hay logs para exportar');
+        return;
+      }
+
+      // Convertir logs a CSV
+      let csv = 'Fecha,Hora,Tipo,Usuario,Estación,IP,Detalles\n';
+
+      logs.forEach(log => {
+        const fecha = new Date(log.created_at);
+        const fechaStr = fecha.toLocaleDateString('es-DO');
+        const horaStr = fecha.toLocaleTimeString('es-DO');
+        const tipo = getEventName(log.event_type);
+        const usuario = usuarios[log.user_id] || 'Sistema';
+        const estacion = estaciones[log.station_id] || '-';
+        const ip = log.ip_address || '-';
+        const detalles = JSON.stringify(log.details || {}).replace(/"/g, '""');
+
+        csv += `"${fechaStr}","${horaStr}","${tipo}","${usuario}","${estacion}","${ip}","${detalles}"\n`;
+      });
+
+      // Descargar archivo
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `logs_${new Date().toISOString().split('T')[0]}.csv`;
+      link.click();
+      window.URL.revokeObjectURL(url);
+
+      console.log('✅ Logs exportados:', logs.length, 'eventos');
+    }
+
+    // ============================================
+    // OTRAS UTILIDADES
+    // ============================================
+    function filtrarLogs() {
+      cargarLogs();
+    }
+
+    function actualizarLogs() {
+      cargarLogs();
+    }
+
+    function actualizarUltimaActualizacion() {
+      const ahora = new Date().toLocaleTimeString('es-DO', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      });
+      document.getElementById('ultima-actualizacion').textContent = `Actualizado a las ${ahora}`;
+    }
+
+    function mostrarError(mensaje) {
+      const tbody = document.getElementById('tabla-logs');
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="6">
+            <div class="empty-state">
+              <div class="icon">❌</div>
+              <h3>Error</h3>
+              <p>${mensaje}</p>
+            </div>
+          </td>
+        </tr>
+      `;
+    }
+
+    async function volverConfig() {
+      try {
+        await window.api.invoke('open-view', 'config');
+      } catch (error) {
+        console.error('Error navegando a config:', error);
+        window.history.back();
+      }
+    }
+
+    // Cerrar modal al hacer clic fuera
+    document.getElementById('modal-detalles').addEventListener('click', function(e) {
+      if (e.target === this) {
+        cerrarModal();
+      }
+    });
+
+    // Tecla ESC para cerrar modal
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') {
+        cerrarModal();
+      }
+    });
+
+    // ============================================
+    // INICIALIZAR
+    // ============================================
+    init();
+  </script>
+</body>
+</html>

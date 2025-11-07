@@ -76,7 +76,7 @@
     <button class="btn" id="backBtn">Volver al Panel</button>
     <button class="btn btn-danger" id="exitBtn">Salir</button>
     <span class="spacer"></span>
-    <button class="btn" id="viewAuditBtn">Ver Auditoría</button>
+    <button class="btn" id="viewReportesBtn">Ver Reportes</button>
   </div>
 
   <div class="grid">
@@ -141,15 +141,50 @@
     </section>
 
     <section class="card" id="statsCard">
-      <h2>Estadísticas de Hoy</h2>
+      <h2>📊 Estadísticas de Hoy</h2>
+
+      <!-- Resumen General -->
       <div class="list" id="statsList">
-        <div class="row"><span class="label">Tickets Hoy</span><span class="value" id="statsTickets">—</span></div>
-        <div class="row"><span class="label">Total DOP</span><span class="value" id="statsDOP">—</span></div>
-        <div class="row"><span class="label">Total USD</span><span class="value" id="statsUSD">—</span></div>
-        <div class="row"><span class="label">Pendientes</span><span class="value" id="statsPending">—</span></div>
+        <div class="row"><span class="label">Total Tickets</span><span class="value" id="statsTickets">—</span></div>
+        <div class="row"><span class="label">💰 Total DOP</span><span class="value" id="statsDOP">—</span></div>
+        <div class="row"><span class="label">💵 Total USD</span><span class="value" id="statsUSD">—</span></div>
+      </div>
+
+      <!-- Por Estado -->
+      <h3 style="margin-top:20px;font-size:16px;color:#64748b;">Por Estado</h3>
+      <div class="list">
+        <div class="row"><span class="label">⏳ Pendientes</span><span class="value" id="statsPending">—</span></div>
+        <div class="row"><span class="label">✅ Canjeados</span><span class="value" id="statsRedeemed">—</span></div>
+      </div>
+
+      <!-- Por Mesa -->
+      <h3 style="margin-top:20px;font-size:16px;color:#64748b;">Por Mesa</h3>
+      <div class="list" id="statsByMesa">
+        <div class="row" style="color:#94a3b8;font-size:13px;">
+          <span class="label">Cargando...</span>
+        </div>
+      </div>
+
+      <!-- Top Operadores -->
+      <h3 style="margin-top:20px;font-size:16px;color:#64748b;">Top Operadores</h3>
+      <div class="list" id="statsByOperador">
+        <div class="row" style="color:#94a3b8;font-size:13px;">
+          <span class="label">Cargando...</span>
+        </div>
       </div>
     </section>
   </div>
+
+  <!-- Panel de Tickets Recientes por Mesa -->
+  <section class="card" style="margin-top:16px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <h2>🎰 Tickets Recientes por Mesa</h2>
+      <button class="btn" id="refreshRecentBtn" style="padding:6px 12px;font-size:12px">🔄 Actualizar</button>
+    </div>
+    <div id="recent-tickets-container" style="max-height:500px;overflow-y:auto">
+      <p style="color:#64748b;text-align:center">Cargando...</p>
+    </div>
+  </section>
 
   <template id="tplRow">
     <div class="row"><span class="label"></span><span class="value"></span></div>
@@ -171,6 +206,9 @@
     const statsDOP = q('#statsDOP');
     const statsUSD = q('#statsUSD');
     const statsPending = q('#statsPending');
+    const statsRedeemed = q('#statsRedeemed');
+    const statsByMesa = q('#statsByMesa');
+    const statsByOperador = q('#statsByOperador');
     const voucherInfo = q('#voucher-info');
     const voucherCodeEl = q('#voucher-code');
     const voucherAmountEl = q('#voucher-amount');
@@ -192,8 +230,8 @@
     q('#exitBtn').addEventListener('click', () => {
       try { window.api?.exitApp?.(); } catch {}
     });
-    q('#viewAuditBtn').addEventListener('click', () => {
-      try { window.api?.navigateTo?.('auditoria'); } catch {}
+    q('#viewReportesBtn').addEventListener('click', () => {
+      try { window.api?.navigateTo?.('reportes'); } catch {}
     });
 
     // Estado del rol
@@ -281,15 +319,23 @@
     async function refreshStats() {
       try {
         const stats = await window.api?.getStatsToday?.();
-        statsTickets.textContent = stats?.ticketsToday ?? '0';
+        statsTickets.textContent = stats?.ticketsHoy ?? '0';
         statsDOP.textContent = stats?.totalDOP ?? '0';
         statsUSD.textContent = stats?.totalUSD ?? '0';
-        statsPending.textContent = stats?.pending ?? '0';
+        statsPending.textContent = stats?.pendientes ?? '0';
+        statsRedeemed.textContent = stats?.cobrados ?? '0';
+
+        // Mostrar mensaje temporal en las secciones nuevas
+        statsByMesa.innerHTML = '<div class="row" style="color:#94a3b8;font-size:13px;"><span class="label">Sin datos</span></div>';
+        statsByOperador.innerHTML = '<div class="row" style="color:#94a3b8;font-size:13px;"><span class="label">Sin datos</span></div>';
       } catch (e) {
         statsTickets.textContent = '0';
         statsDOP.textContent = '0';
         statsUSD.textContent = '0';
         statsPending.textContent = '0';
+        statsRedeemed.textContent = '0';
+        statsByMesa.innerHTML = '<div class="row" style="color:#94a3b8;font-size:13px;"><span class="label">Error cargando</span></div>';
+        statsByOperador.innerHTML = '<div class="row" style="color:#94a3b8;font-size:13px;"><span class="label">Error cargando</span></div>';
       }
     }
 
@@ -389,6 +435,126 @@
         refreshStats();
       }
     } catch { refreshStats(); }
+
+    // ============================================
+    // PANEL DE TICKETS RECIENTES POR MESA
+    // ============================================
+    async function loadRecentTickets() {
+      const container = document.getElementById('recent-tickets-container');
+      if (!container) return;
+
+      try {
+        container.innerHTML = '<p style="color:#64748b;text-align:center">Cargando...</p>';
+
+        const result = await window.api?.getRecentTickets?.(20);
+
+        if (!result || !result.success || !result.tickets || result.tickets.length === 0) {
+          container.innerHTML = '<p style="color:#64748b;text-align:center">No hay tickets emitidos hoy</p>';
+          return;
+        }
+
+        // Agrupar tickets por estado para facilitar visualización
+        const pendientes = result.tickets.filter(t => t.estado === 'Pendiente');
+        const cobrados = result.tickets.filter(t => t.estado === 'Cobrado');
+        const otros = result.tickets.filter(t => t.estado !== 'Pendiente' && t.estado !== 'Cobrado');
+
+        let html = '';
+
+        // Sección de Pendientes (más importante para Caja)
+        if (pendientes.length > 0) {
+          html += '<h3 style="color:#e3b341;font-size:16px;margin:16px 0 12px">⏳ Pendientes de Cobrar</h3>';
+          html += '<div style="display:grid;gap:10px">';
+          pendientes.forEach(t => {
+            // Detectar si faltan datos (ticket sospechoso/viejo)
+            const isSuspicious = t.operador === 'Desconocido' || t.mesa.includes('?');
+            const borderColor = isSuspicious ? '#e35d5d33' : '#e3b34133';
+            const warningBadge = isSuspicious ? '<span style="font-size:11px;color:#e35d5d;margin-left:8px">⚠️ Datos incompletos</span>' : '';
+
+            html += `
+              <div style="padding:14px;border:2px solid ${borderColor};border-radius:10px;background:#0f1731;transition:all 0.2s" onmouseover="this.style.background='#141b35'" onmouseout="this.style.background='#0f1731'">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                  <div style="display:flex;align-items:center;gap:8px">
+                    <strong style="color:#2e7de9;font-size:15px">${t.code}</strong>
+                    ${warningBadge}
+                  </div>
+                  <span style="font-size:12px;padding:4px 10px;border-radius:999px;background:#e3b34133;color:#e3b341">
+                    ${t.estado}
+                  </span>
+                </div>
+                <div style="display:grid;grid-template-columns:auto 1fr;gap:8px 16px;font-size:13px;color:#a9b3c7">
+                  <span>🎰 Mesa:</span><span style="color:${isSuspicious ? '#e35d5d' : '#e8eefc'}">${t.mesa}</span>
+                  <span>👤 Operador:</span><span style="color:${isSuspicious ? '#e35d5d' : '#e8eefc'}">${t.operador}</span>
+                  <span>💰 Monto:</span><span style="color:#7bc379;font-weight:600;font-size:18px">${t.currency} ${Number(t.amount).toFixed(2)}</span>
+                </div>
+                <div style="font-size:11px;color:#64748b;margin-top:8px;text-align:right">
+                  ${new Date(t.fecha).toLocaleTimeString('es-DO', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                </div>
+              </div>
+            `;
+          });
+          html += '</div>';
+        }
+
+        // Sección de Cobrados (para referencia)
+        if (cobrados.length > 0) {
+          html += '<h3 style="color:#7bc379;font-size:16px;margin:24px 0 12px">✅ Recién Cobrados</h3>';
+          html += '<div style="display:grid;gap:8px">';
+          cobrados.slice(0, 5).forEach(t => { // Solo los últimos 5 cobrados
+            html += `
+              <div style="padding:10px;border:1px solid #1f2740;border-radius:8px;background:#0e1427;opacity:0.7">
+                <div style="display:flex;justify-content:space-between;align-items:center">
+                  <div>
+                    <strong style="color:#64748b;font-size:13px">${t.code}</strong>
+                    <span style="color:#a9b3c7;font-size:12px;margin-left:8px">${t.mesa} · ${t.operador}</span>
+                  </div>
+                  <span style="color:#7bc379;font-weight:600">${t.currency} ${Number(t.amount).toFixed(2)}</span>
+                </div>
+              </div>
+            `;
+          });
+          html += '</div>';
+        }
+
+        // Otros estados si hay
+        if (otros.length > 0) {
+          html += '<details style="margin-top:16px"><summary style="cursor:pointer;color:#a9b3c7;font-size:14px">Otros estados (${otros.length})</summary>';
+          html += '<div style="display:grid;gap:6px;margin-top:8px">';
+          otros.forEach(t => {
+            html += `
+              <div style="padding:8px;border:1px solid #1f2740;border-radius:6px;background:#0b0f1a;font-size:12px">
+                <span style="color:#64748b">${t.code}</span> -
+                <span style="color:#e35d5d">${t.estado}</span>
+              </div>
+            `;
+          });
+          html += '</div></details>';
+        }
+
+        container.innerHTML = html;
+        console.log(`✅ Panel de tickets recientes actualizado: ${result.tickets.length} tickets`);
+      } catch (error) {
+        console.error('❌ Error cargando tickets recientes:', error);
+        container.innerHTML = '<p style="color:#ef4444;text-align:center">Error cargando tickets</p>';
+      }
+    }
+
+    // Cargar tickets al iniciar Caja
+    loadRecentTickets();
+
+    // Botón de refrescar
+    const refreshRecentBtn = document.getElementById('refreshRecentBtn');
+    if (refreshRecentBtn) {
+      refreshRecentBtn.addEventListener('click', () => {
+        console.log('🔄 Refrescando panel de tickets recientes...');
+        loadRecentTickets();
+      });
+    }
+
+    // Auto-refresh cada 30 segundos
+    setInterval(() => {
+      console.log('🔄 Auto-refresh de tickets recientes...');
+      loadRecentTickets();
+    }, 30000);
 
     // Sistema de salud anti-cuelgues: cargar indicador visual
     (async function cargarIndicadorSalud() {

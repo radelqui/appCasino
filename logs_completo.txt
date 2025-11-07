@@ -1,0 +1,38 @@
+
+> tito-casino-system@1.0.0 start
+> electron .
+
+
+[dotenv@17.2.3] injecting env (10) from .env -- tip: 🔐 prevent committing .env to code: https://dotenvx.com/precommit
+⚠️  Node.js 18 and below are deprecated and will no longer be supported in future versions of @supabase/supabase-js. Please upgrade to Node.js 20 or later. For more information, visit: https://github.com/orgs/supabase/discussions/37217
+📝 Registrando handlers de autenticación...
+✅ Handlers de autenticación registrados (auth:login, auth:get-session, get-role, set-role, auth:logout)
+✅ Health Monitor inicializado
+✅ Safe Database Operations inicializado
+✅ Cliente Supabase SERVICE_ROLE inicializado
+✅ Cliente Supabase ANON inicializado
+⚡ Supabase Manager inicializado (verificando conexión en segundo plano...)
+✅ Safe Supabase Operations inicializado
+✅ Printer Service inicializado
+🔒 Inicializando sistema de seguridad...
+🔒 Cargadas 0 IPs bloqueadas
+✅ Backup automático configurado: cada 24 horas
+✅ Sistema de seguridad inicializado
+📝 Registrando handlers de Caja...
+[dotenv@17.2.3] injecting env (0) from .env -- tip: 🔐 prevent committing .env to code: https://dotenvx.com/precommit
+[dotenv@17.2.3] injecting env (0) from .env -- tip: ⚙️  suppress all logs with { quiet: true }
+✅ Handlers de caja registrados (namespace caja:*)
+✅ Handlers de Caja registrados
+📝 Registrando handlers de impresora...
+✅ Handlers de impresora registrados
+🔄 Iniciando worker de sincronización...
+🔄 Iniciando worker de sincronización...
+✅ Worker de sincronización iniciado (intervalo: 2 minutos)
+✅ Worker de sincronización iniciado
+🪟 Creando ventana principal...
+  → Creando BrowserWindow...
+  → Cargando panel.html...
+[Handler] get-role llamado, role: null
+�Desea terminar el trabajo por lotes (S/N)? C:\appCasino\node_modules\electron\dist\electron.exe exited with signal SIGINT
+
+^C

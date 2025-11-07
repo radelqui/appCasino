@@ -103,12 +103,18 @@ class CasinoDatabase {
       CREATE TABLE IF NOT EXISTS audit_log (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         action TEXT NOT NULL CHECK(action IN (
-          'voucher_created', 
-          'voucher_redeemed', 
-          'voucher_cancelled', 
+          'voucher_created',
+          'voucher_issued',
+          'voucher_redeemed',
+          'voucher_cancelled',
           'voucher_expired',
           'user_login',
           'user_logout',
+          'user_created',
+          'user_updated',
+          'operator_created',
+          'operator_updated',
+          'session_closed',
           'config_changed'
         )),
         user_id TEXT,

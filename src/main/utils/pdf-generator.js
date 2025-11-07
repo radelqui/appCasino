@@ -113,11 +113,54 @@ async function generateTicketPDF({ ticket_number, valor, moneda, fecha_emision, 
 
   const margin = 0; // sin márgenes: la Epson los maneja
 
+  // ⚡ FRANJAS HORIZONTALES arriba y abajo con color MUY transparente (DOP azul, USD verde)
+  const palette = getPalette(moneda);
+  const stripeHeight = mmToPt(8); // 8mm de alto
+  const currencyLabel = (moneda || 'DOP').toUpperCase(); // "DOP" o "USD"
+
+  // Franja SUPERIOR con color muy transparente
+  page.drawRectangle({
+    x: 0,
+    y: height - stripeHeight,
+    width: width,
+    height: stripeHeight,
+    color: palette.primary,
+    opacity: 0.15, // 15% transparencia (MUY suave)
+  });
+
+  // Franja INFERIOR con color muy transparente
+  page.drawRectangle({
+    x: 0,
+    y: 0,
+    width: width,
+    height: stripeHeight,
+    color: palette.primary,
+    opacity: 0.15, // 15% transparencia (MUY suave)
+  });
+
+  // Texto en franja SUPERIOR (centrado)
+  page.drawText(currencyLabel, {
+    x: width - mmToPt(15), // A la derecha
+    y: height - stripeHeight / 2 - 3,
+    size: 10,
+    font: fontBold,
+    color: rgb(1, 1, 1), // Blanco
+  });
+
+  // Texto en franja INFERIOR (centrado)
+  page.drawText(currencyLabel, {
+    x: mmToPt(5), // A la izquierda
+    y: stripeHeight / 2 - 3,
+    size: 10,
+    font: fontBold,
+    color: rgb(1, 1, 1), // Blanco
+  });
+
   // Texto en negro sobre blanco
   const casinoTitle = (process.env.CASINO_NAME || 'CORAL REEF CASINO');
   const casinoSubtitle = (process.env.CASINO_SUBTITLE || 'GRAN CASINO SOSÚA');
 
-  let y = height - mmToPt(5); // inicio a 5mm del borde superior
+  let y = height - stripeHeight - mmToPt(3); // inicio después de franja superior
 
   // Logo centrado si existe
   try {

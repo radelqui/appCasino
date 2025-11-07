@@ -1,0 +1,1157 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reportes - Sistema TITO Casino</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 20px;
+      color: #333;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 15px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+      overflow: hidden;
+    }
+
+    .header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      padding: 30px;
+      color: white;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .header h1 {
+      font-size: 28px;
+      display: flex;
+      align-items: center;
+      gap: 15px;
+    }
+
+    .btn-close {
+      background: rgba(255,255,255,0.2);
+      border: 2px solid white;
+      color: white;
+      padding: 10px 25px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 16px;
+      font-weight: 600;
+      transition: all 0.3s;
+    }
+
+    .btn-close:hover {
+      background: white;
+      color: #667eea;
+      transform: scale(1.05);
+    }
+
+    .content {
+      padding: 30px;
+    }
+
+    /* Filtros */
+    .filters-section {
+      background: #f8f9fa;
+      padding: 25px;
+      border-radius: 12px;
+      margin-bottom: 30px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .filters-title {
+      font-size: 20px;
+      font-weight: 600;
+      margin-bottom: 20px;
+      color: #667eea;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .filters-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 20px;
+      margin-bottom: 20px;
+    }
+
+    .filter-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .filter-group label {
+      font-weight: 600;
+      color: #555;
+      font-size: 14px;
+    }
+
+    .filter-group input,
+    .filter-group select {
+      padding: 12px;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 14px;
+      transition: all 0.3s;
+    }
+
+    .filter-group input:focus,
+    .filter-group select:focus {
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+
+    .filter-actions {
+      display: flex;
+      gap: 15px;
+      margin-top: 20px;
+    }
+
+    .btn {
+      padding: 12px 30px;
+      border: none;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+    }
+
+    .btn-secondary {
+      background: #6c757d;
+      color: white;
+    }
+
+    .btn-secondary:hover {
+      background: #5a6268;
+      transform: translateY(-2px);
+    }
+
+    .btn-success {
+      background: #28a745;
+      color: white;
+    }
+
+    .btn-success:hover {
+      background: #218838;
+      transform: translateY(-2px);
+    }
+
+    .btn-danger {
+      background: #dc3545;
+      color: white;
+    }
+
+    .btn-danger:hover {
+      background: #c82333;
+      transform: translateY(-2px);
+    }
+
+    .btn-info {
+      background: #17a2b8;
+      color: white;
+    }
+
+    .btn-info:hover {
+      background: #138496;
+      transform: translateY(-2px);
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none !important;
+    }
+
+    /* Resultados */
+    .results-section {
+      margin-top: 30px;
+    }
+
+    .results-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 15px;
+      border-bottom: 3px solid #667eea;
+    }
+
+    .results-title {
+      font-size: 22px;
+      font-weight: 600;
+      color: #333;
+    }
+
+    .results-count {
+      font-size: 14px;
+      color: #666;
+      background: #f8f9fa;
+      padding: 8px 15px;
+      border-radius: 20px;
+    }
+
+    .export-actions {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    /* Tabla */
+    .table-container {
+      overflow-x: auto;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: white;
+    }
+
+    thead {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+
+    th {
+      padding: 15px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      text-transform: uppercase;
+    }
+
+    td {
+      padding: 15px;
+      border-bottom: 1px solid #e0e0e0;
+      font-size: 14px;
+    }
+
+    tbody tr:hover {
+      background: #f8f9fa;
+    }
+
+    tbody tr:last-child td {
+      border-bottom: none;
+    }
+
+    .no-data {
+      text-align: center;
+      padding: 60px 20px;
+      color: #999;
+      font-size: 18px;
+    }
+
+    .no-data-icon {
+      font-size: 60px;
+      margin-bottom: 20px;
+      opacity: 0.3;
+    }
+
+    /* Loading */
+    .loading {
+      text-align: center;
+      padding: 60px 20px;
+      color: #667eea;
+      font-size: 18px;
+    }
+
+    .loading-spinner {
+      display: inline-block;
+      width: 50px;
+      height: 50px;
+      border: 5px solid #f3f3f3;
+      border-top: 5px solid #667eea;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-bottom: 20px;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    /* Badges */
+    .badge {
+      display: inline-block;
+      padding: 5px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .badge-success {
+      background: #d4edda;
+      color: #155724;
+    }
+
+    .badge-warning {
+      background: #fff3cd;
+      color: #856404;
+    }
+
+    .badge-danger {
+      background: #f8d7da;
+      color: #721c24;
+    }
+
+    .badge-info {
+      background: #d1ecf1;
+      color: #0c5460;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .header {
+        flex-direction: column;
+        gap: 20px;
+      }
+
+      .filters-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .filter-actions {
+        flex-direction: column;
+      }
+
+      .btn {
+        width: 100%;
+        justify-content: center;
+      }
+
+      .results-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 15px;
+      }
+
+      .export-actions {
+        flex-wrap: wrap;
+      }
+    }
+
+    /* Summary cards */
+    .summary-section {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 20px;
+      margin-bottom: 30px;
+    }
+
+    .summary-card {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      padding: 20px;
+      border-radius: 12px;
+      color: white;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+
+    .summary-card-title {
+      font-size: 14px;
+      opacity: 0.9;
+      margin-bottom: 10px;
+    }
+
+    .summary-card-value {
+      font-size: 28px;
+      font-weight: 700;
+    }
+
+    .summary-card-subtitle {
+      font-size: 12px;
+      opacity: 0.8;
+      margin-top: 5px;
+    }
+
+    /* PDF Viewer Modal */
+    .pdf-modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.9);
+      z-index: 10000;
+      padding: 20px;
+    }
+
+    .pdf-modal.active {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .pdf-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 15px 20px;
+      background: #667eea;
+      color: white;
+      border-radius: 8px 8px 0 0;
+    }
+
+    .pdf-header h3 {
+      margin: 0;
+      font-size: 18px;
+    }
+
+    .pdf-controls {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .pdf-btn {
+      background: rgba(255,255,255,0.2);
+      border: 1px solid white;
+      color: white;
+      padding: 8px 15px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: all 0.3s;
+    }
+
+    .pdf-btn:hover {
+      background: white;
+      color: #667eea;
+    }
+
+    .pdf-content {
+      flex: 1;
+      background: white;
+      border-radius: 0 0 8px 8px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .pdf-viewer-container {
+      flex: 1;
+      width: 100%;
+      border: none;
+      background: #f5f5f5;
+    }
+
+    .pdf-loading {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: #667eea;
+    }
+
+    .pdf-loading-spinner {
+      width: 60px;
+      height: 60px;
+      border: 6px solid #f3f3f3;
+      border-top: 6px solid #667eea;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-bottom: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>
+        📊 Reportes y Análisis
+      </h1>
+      <button class="btn-close" onclick="cerrar()">✕ Cerrar</button>
+    </div>
+
+    <div class="content">
+      <!-- Filtros -->
+      <div class="filters-section">
+        <div class="filters-title">
+          🔍 Filtros de Búsqueda
+        </div>
+
+        <div class="filters-grid">
+          <div class="filter-group">
+            <label for="tipo-reporte">Tipo de Reporte</label>
+            <select id="tipo-reporte">
+              <optgroup label="📊 Reportes Básicos">
+                <option value="stats_by_currency">Estadísticas por Moneda</option>
+                <option value="popular_amounts">Montos Más Populares</option>
+                <option value="out_of_range">Vouchers Fuera de Rango</option>
+                <option value="vouchers_detail">Detalle de Vouchers</option>
+                <option value="audit_log">Registro de Auditoría</option>
+              </optgroup>
+              <optgroup label="📈 Reportes Avanzados">
+                <option value="daily_summary_advanced">📅 Resumen Diario Completo</option>
+                <option value="reports_by_shift">🕐 Reportes por Turno</option>
+                <option value="reports_by_operator">👤 Reportes por Operador</option>
+                <option value="reports_by_station">🎰 Reportes por Mesa/Estación</option>
+                <option value="top_operators">🏆 Top Operadores</option>
+                <option value="mesa_ranking">📊 Ranking de Mesas</option>
+                <option value="anomalies">⚠️ Detección de Anomalías</option>
+              </optgroup>
+            </select>
+          </div>
+
+          <div class="filter-group">
+            <label for="fecha-inicio">Fecha Inicio</label>
+            <input type="date" id="fecha-inicio">
+          </div>
+
+          <div class="filter-group">
+            <label for="fecha-fin">Fecha Fin</label>
+            <input type="date" id="fecha-fin">
+          </div>
+
+          <div class="filter-group">
+            <label for="moneda">Moneda</label>
+            <select id="moneda">
+              <option value="">Todas</option>
+              <option value="USD">USD</option>
+              <option value="DOP">DOP</option>
+            </select>
+          </div>
+
+          <div class="filter-group">
+            <label for="estado">Estado</label>
+            <select id="estado">
+              <option value="">Todos</option>
+              <option value="active">Activo</option>
+              <option value="redeemed">Canjeado</option>
+              <option value="cancelled">Cancelado</option>
+              <option value="expired">Expirado</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="filter-actions">
+          <button class="btn btn-primary" onclick="generarReporte()">
+            📊 Generar Reporte
+          </button>
+          <button class="btn btn-secondary" onclick="limpiarFiltros()">
+            🔄 Limpiar Filtros
+          </button>
+        </div>
+      </div>
+
+      <!-- Resumen (solo visible cuando hay datos) -->
+      <div id="summary-container" style="display: none;">
+        <div class="summary-section" id="summary-cards">
+          <!-- Cards dinámicos aquí -->
+        </div>
+      </div>
+
+      <!-- Resultados -->
+      <div class="results-section">
+        <div class="results-header">
+          <div>
+            <div class="results-title" id="results-title">Resultados del Reporte</div>
+            <div class="results-count" id="results-count" style="display: none;">
+              0 registros encontrados
+            </div>
+          </div>
+        </div>
+
+        <div class="export-actions" id="export-actions" style="display: none;">
+          <button class="btn btn-success" onclick="exportarExcel()">
+            📗 Exportar a Excel
+          </button>
+          <button class="btn btn-danger" onclick="exportarPDF()">
+            📕 Exportar a PDF
+          </button>
+          <button class="btn btn-info" onclick="imprimir()">
+            🖨️ Imprimir
+          </button>
+        </div>
+
+        <div id="results-container">
+          <div class="no-data">
+            <div class="no-data-icon">📊</div>
+            <div>Selecciona los filtros y haz clic en "Generar Reporte" para ver los resultados</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentData = null;
+    let currentReportType = null;
+
+    // Inicializar fechas por defecto (último mes)
+    function initDates() {
+      const today = new Date();
+      const lastMonth = new Date();
+      lastMonth.setMonth(lastMonth.getMonth() - 1);
+
+      document.getElementById('fecha-fin').valueAsDate = today;
+      document.getElementById('fecha-inicio').valueAsDate = lastMonth;
+    }
+
+    // Generar reporte
+    async function generarReporte() {
+      try {
+        const tipoReporte = document.getElementById('tipo-reporte').value;
+        const fechaInicio = document.getElementById('fecha-inicio').value;
+        const fechaFin = document.getElementById('fecha-fin').value;
+        const moneda = document.getElementById('moneda').value;
+        const estado = document.getElementById('estado').value;
+
+        console.log('🔍 Generando reporte:', { tipoReporte, fechaInicio, fechaFin, moneda, estado });
+
+        // Mostrar loading
+        document.getElementById('results-container').innerHTML = `
+          <div class="loading">
+            <div class="loading-spinner"></div>
+            <div>Generando reporte...</div>
+          </div>
+        `;
+
+        // Llamar al backend
+        const result = await window.api.invoke('reportes:generate', {
+          type: tipoReporte,
+          filters: {
+            fechaInicio,
+            fechaFin,
+            moneda,
+            estado
+          }
+        });
+
+        if (!result.success) {
+          throw new Error(result.error || 'Error generando reporte');
+        }
+
+        // Guardar datos actuales
+        currentData = result.data;
+        currentReportType = tipoReporte;
+
+        // Renderizar resultados
+        renderResults(result.data, tipoReporte);
+
+        // Mostrar acciones de exportación
+        document.getElementById('export-actions').style.display = 'flex';
+        document.getElementById('results-count').style.display = 'block';
+        document.getElementById('results-count').textContent =
+          `${result.data.length} registro${result.data.length !== 1 ? 's' : ''} encontrado${result.data.length !== 1 ? 's' : ''}`;
+
+        // Mostrar resumen si aplica
+        if (result.summary) {
+          renderSummary(result.summary);
+        }
+
+      } catch (error) {
+        console.error('❌ Error generando reporte:', error);
+        document.getElementById('results-container').innerHTML = `
+          <div class="no-data">
+            <div class="no-data-icon">❌</div>
+            <div>Error: ${error.message}</div>
+          </div>
+        `;
+        document.getElementById('export-actions').style.display = 'none';
+        document.getElementById('results-count').style.display = 'none';
+        document.getElementById('summary-container').style.display = 'none';
+      }
+    }
+
+    // Renderizar resumen
+    function renderSummary(summary) {
+      const container = document.getElementById('summary-cards');
+      container.innerHTML = '';
+
+      Object.keys(summary).forEach(key => {
+        const card = document.createElement('div');
+        card.className = 'summary-card';
+        card.innerHTML = `
+          <div class="summary-card-title">${formatKey(key)}</div>
+          <div class="summary-card-value">${formatValue(summary[key], key)}</div>
+        `;
+        container.appendChild(card);
+      });
+
+      document.getElementById('summary-container').style.display = 'block';
+    }
+
+    // Renderizar resultados
+    function renderResults(data, type) {
+      const container = document.getElementById('results-container');
+
+      if (!data || data.length === 0) {
+        container.innerHTML = `
+          <div class="no-data">
+            <div class="no-data-icon">📭</div>
+            <div>No se encontraron resultados con los filtros especificados</div>
+          </div>
+        `;
+        return;
+      }
+
+      // Crear tabla
+      const headers = Object.keys(data[0]);
+      let html = `
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                ${headers.map(h => `<th>${formatHeader(h)}</th>`).join('')}
+              </tr>
+            </thead>
+            <tbody>
+              ${data.map(row => `
+                <tr>
+                  ${headers.map(h => `<td>${formatCell(row[h], h)}</td>`).join('')}
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+
+      container.innerHTML = html;
+    }
+
+    // Formatear headers
+    function formatHeader(key) {
+      const translations = {
+        currency: 'Moneda',
+        total_vouchers: 'Total Vouchers',
+        active_vouchers: 'Activos',
+        redeemed_vouchers: 'Canjeados',
+        cancelled_vouchers: 'Cancelados',
+        expired_vouchers: 'Expirados',
+        min_amount: 'Mínimo',
+        max_amount: 'Máximo',
+        avg_amount: 'Promedio',
+        total_amount: 'Monto Total',
+        active_amount: 'Monto Activo',
+        redeemed_amount: 'Monto Canjeado',
+        redemption_rate_pct: 'Tasa Canje %',
+        amount_redeemed_pct: 'Monto Canjeado %',
+        amount: 'Monto',
+        usage_count: 'Cantidad Usada',
+        active_count: 'Activos',
+        redeemed_count: 'Canjeados',
+        voucher_code: 'Código',
+        status: 'Estado',
+        created_at: 'Creado',
+        issue: 'Problema',
+        action: 'Acción',
+        details: 'Detalles',
+        timestamp: 'Fecha/Hora',
+        // Nuevos campos de reportes avanzados
+        fecha: 'Fecha',
+        turno: 'Turno',
+        activos: 'Activos',
+        cobrados: 'Cobrados',
+        monto_total: 'Monto Total',
+        monto_activo: 'Monto Activo',
+        monto_cobrado: 'Monto Cobrado',
+        monto_promedio: 'Promedio',
+        tasa_cobro_pct: 'Tasa Cobro %',
+        operador_nombre: 'Operador',
+        mesa_nombre: 'Mesa',
+        total_emitidos: 'Total Emitidos',
+        monto_minimo: 'Mínimo',
+        monto_maximo: 'Máximo',
+        pendientes: 'Pendientes',
+        primera_emision: 'Primera Emisión',
+        ultima_emision: 'Última Emisión',
+        horas_activo: 'Horas Activo',
+        operadores_activos: 'Operadores Activos',
+        total_usd: 'Total USD',
+        total_dop: 'Total DOP',
+        ticket_promedio: 'Ticket Promedio',
+        tickets_por_hora: 'Tickets/Hora',
+        mesas_activas: 'Mesas Activas',
+        total_general: 'Total General',
+        tickets_cobrados: 'Tickets Cobrados',
+        tickets_pendientes: 'Tickets Pendientes',
+        tickets_cancelados: 'Tickets Cancelados',
+        tickets_expirados: 'Tickets Expirados',
+        promedio_usd: 'Promedio USD',
+        promedio_dop: 'Promedio DOP',
+        monto_minimo: 'Mínimo',
+        monto_maximo: 'Máximo',
+        horas_operacion: 'Horas Operación',
+        total_tickets: 'Total Tickets',
+        monto_total_generado: 'Monto Total Generado',
+        mesas_trabajadas: 'Mesas Trabajadas',
+        dias_activo: 'Días Activo',
+        tickets_cobrados: 'Tickets Cobrados',
+        primera_actividad: 'Primera Actividad',
+        ultima_actividad: 'Última Actividad',
+        revenue_total: 'Revenue Total',
+        operadores_asignados: 'Operadores Asignados',
+        revenue_rank: 'Ranking Revenue',
+        volume_rank: 'Ranking Volumen',
+        tipo_anomalia: 'Tipo Anomalía',
+        severidad: 'Severidad',
+        descripcion: 'Descripción',
+        promedio_operador: 'Promedio Operador',
+        tickets_en_ventana: 'Tickets en 5min',
+        hora_emision: 'Hora Emisión',
+        issued_at: 'Fecha Emisión'
+      };
+
+      return translations[key] || key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+    }
+
+    // Formatear celdas
+    function formatCell(value, key) {
+      if (value === null || value === undefined) return '-';
+
+      // Formatear montos
+      if (key.includes('amount') || key.includes('min_') || key.includes('max_') || key.includes('avg_')) {
+        return typeof value === 'number' ? `$${value.toFixed(2)}` : value;
+      }
+
+      // Formatear porcentajes
+      if (key.includes('_pct') || key.includes('rate')) {
+        return typeof value === 'number' ? `${value.toFixed(2)}%` : value;
+      }
+
+      // Formatear fechas
+      if (key.includes('_at') || key === 'timestamp') {
+        try {
+          return new Date(value).toLocaleString('es-DO');
+        } catch (e) {
+          return value;
+        }
+      }
+
+      // Formatear estados
+      if (key === 'status') {
+        const badges = {
+          active: '<span class="badge badge-success">Activo</span>',
+          redeemed: '<span class="badge badge-info">Canjeado</span>',
+          cancelled: '<span class="badge badge-warning">Cancelado</span>',
+          expired: '<span class="badge badge-danger">Expirado</span>'
+        };
+        return badges[value] || value;
+      }
+
+      // Formatear severidad de anomalías
+      if (key === 'severidad') {
+        const badges = {
+          HIGH: '<span class="badge badge-danger">ALTA</span>',
+          MEDIUM: '<span class="badge badge-warning">MEDIA</span>',
+          LOW: '<span class="badge badge-info">BAJA</span>',
+          INFO: '<span class="badge badge-success">INFO</span>'
+        };
+        return badges[value] || value;
+      }
+
+      // Formatear tipo de anomalía
+      if (key === 'tipo_anomalia') {
+        const types = {
+          MONTO_ALTO: '💰 Monto Alto',
+          VELOCIDAD_ALTA: '⚡ Velocidad Alta',
+          HORARIO_INUSUAL: '🌙 Horario Inusual'
+        };
+        return types[value] || value;
+      }
+
+      // Formatear horas
+      if (key.includes('horas_')) {
+        return typeof value === 'number' ? `${value.toFixed(1)}h` : value;
+      }
+
+      // Formatear fecha solo (sin hora)
+      if (key === 'fecha') {
+        try {
+          return new Date(value).toLocaleDateString('es-DO');
+        } catch (e) {
+          return value;
+        }
+      }
+
+      return value;
+    }
+
+    // Formatear keys
+    function formatKey(key) {
+      const translations = {
+        total_vouchers: 'Total de Vouchers',
+        total_amount: 'Monto Total',
+        avg_amount: 'Monto Promedio',
+        active_count: 'Vouchers Activos',
+        redeemed_count: 'Vouchers Canjeados'
+      };
+      return translations[key] || key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+    }
+
+    // Formatear valores
+    function formatValue(value, key) {
+      if (key.includes('amount') || key.includes('total')) {
+        return typeof value === 'number' ? `$${value.toFixed(2)}` : value;
+      }
+      return value;
+    }
+
+    // Exportar a Excel
+    async function exportarExcel() {
+      if (!currentData) {
+        alert('No hay datos para exportar');
+        return;
+      }
+
+      try {
+        console.log('📗 Exportando a Excel...');
+
+        const result = await window.api.invoke('reportes:export', {
+          type: currentReportType,
+          format: 'excel',
+          data: currentData
+        });
+
+        if (!result.success) {
+          if (result.error === 'Exportación cancelada por el usuario') {
+            return; // Usuario canceló, no mostrar error
+          }
+          throw new Error(result.error || 'Error exportando a Excel');
+        }
+
+        // Preguntar si quiere abrir el archivo
+        const abrir = confirm(`✅ Reporte exportado exitosamente:\n${result.path}\n\n¿Desea abrir el archivo ahora?`);
+        if (abrir) {
+          await window.api.invoke('open-file', result.path);
+        }
+      } catch (error) {
+        console.error('❌ Error exportando a Excel:', error);
+        alert(`Error exportando a Excel: ${error.message}`);
+      }
+    }
+
+    // Exportar a PDF
+    async function exportarPDF() {
+      if (!currentData) {
+        alert('No hay datos para exportar');
+        return;
+      }
+
+      try {
+        console.log('📕 Exportando a PDF...');
+
+        const result = await window.api.invoke('reportes:export', {
+          type: currentReportType,
+          format: 'pdf',
+          data: currentData
+        });
+
+        if (!result.success) {
+          if (result.error === 'Exportación cancelada por el usuario') {
+            return; // Usuario canceló, no mostrar error
+          }
+          throw new Error(result.error || 'Error exportando a PDF');
+        }
+
+        // Preguntar si quiere abrir el archivo
+        const abrir = confirm(`✅ Reporte exportado exitosamente:\n${result.path}\n\n¿Desea abrir el archivo ahora?`);
+        if (abrir) {
+          await window.api.invoke('open-file', result.path);
+        }
+      } catch (error) {
+        console.error('❌ Error exportando a PDF:', error);
+        alert(`Error exportando a PDF: ${error.message}`);
+      }
+    }
+
+    // Imprimir
+    function imprimir() {
+      window.print();
+    }
+
+    // Limpiar filtros
+    function limpiarFiltros() {
+      document.getElementById('tipo-reporte').value = 'stats_by_currency';
+      document.getElementById('moneda').value = '';
+      document.getElementById('estado').value = '';
+      initDates();
+
+      // Limpiar resultados
+      document.getElementById('results-container').innerHTML = `
+        <div class="no-data">
+          <div class="no-data-icon">📊</div>
+          <div>Selecciona los filtros y haz clic en "Generar Reporte" para ver los resultados</div>
+        </div>
+      `;
+      document.getElementById('export-actions').style.display = 'none';
+      document.getElementById('results-count').style.display = 'none';
+      document.getElementById('summary-container').style.display = 'none';
+
+      currentData = null;
+      currentReportType = null;
+    }
+
+    // Ver PDF en viewer integrado
+    async function verPDFViewer() {
+      if (!currentData) {
+        alert('No hay datos para generar PDF');
+        return;
+      }
+
+      try {
+        console.log('📄 Generando PDF para vista previa...');
+
+        // Generar PDF temporal
+        const result = await window.api.invoke('reportes:export', {
+          type: currentReportType,
+          format: 'pdf',
+          data: currentData,
+          temp: true // Flag para indicar que es temporal
+        });
+
+        if (!result.success) {
+          throw new Error(result.error || 'Error generando PDF');
+        }
+
+        // Guardar ruta del PDF actual
+        currentPDFPath = result.path;
+
+        // Abrir en ventana dedicada usando BrowserWindow
+        console.log('🪟 Abriendo visor PDF...');
+        const openResult = await window.api.openPDFViewer(result.path);
+
+        if (!openResult.success) {
+          throw new Error(openResult.error || 'Error abriendo visor PDF');
+        }
+
+        console.log('✅ PDF abierto en ventana dedicada');
+
+      } catch (error) {
+        console.error('❌ Error mostrando PDF:', error);
+        alert(`Error mostrando PDF: ${error.message}`);
+      }
+    }
+
+    // Cerrar PDF Viewer
+    function cerrarPDFViewer() {
+      const modal = document.getElementById('pdf-modal');
+      modal.classList.remove('active');
+
+      // Limpiar contenido
+      const viewerContent = document.getElementById('pdf-viewer-content');
+      viewerContent.innerHTML = `
+        <div class="pdf-loading">
+          <div class="pdf-loading-spinner"></div>
+          <div>Cargando PDF...</div>
+        </div>
+      `;
+
+      currentPDFPath = null;
+    }
+
+    // Descargar PDF actual
+    async function descargarPDFActual() {
+      if (!currentPDFPath) {
+        alert('No hay PDF cargado');
+        return;
+      }
+
+      try {
+        // Abrir diálogo de guardado
+        const result = await window.api.invoke('reportes:export', {
+          type: currentReportType,
+          format: 'pdf',
+          data: currentData
+        });
+
+        if (result.success) {
+          alert(`✅ PDF guardado en:\n${result.path}`);
+        }
+      } catch (error) {
+        console.error('❌ Error descargando PDF:', error);
+        alert(`Error descargando PDF: ${error.message}`);
+      }
+    }
+
+    // Imprimir PDF actual
+    async function imprimirPDFActual() {
+      if (!currentPDFPath) {
+        alert('No hay PDF cargado');
+        return;
+      }
+
+      try {
+        await window.api.invoke('open-file', currentPDFPath);
+        // El sistema abrirá el PDF con el visor predeterminado desde donde se puede imprimir
+      } catch (error) {
+        console.error('❌ Error abriendo PDF para imprimir:', error);
+        alert(`Error abriendo PDF: ${error.message}`);
+      }
+    }
+
+    // Cerrar y volver al panel
+    async function cerrar() {
+      try {
+        await window.api.invoke('open-view', 'panel');
+      } catch (error) {
+        console.error('Error volviendo al panel:', error);
+        // Fallback: intentar cerrar ventana
+        try {
+          await window.api.invoke('close-current');
+        } catch (e) {
+          console.error('Error cerrando ventana:', e);
+        }
+      }
+    }
+
+    // Inicializar
+    initDates();
+  </script>
+
+  <style media="print">
+    .header,
+    .filters-section,
+    .export-actions,
+    .btn-close {
+      display: none !important;
+    }
+
+    body {
+      background: white;
+      padding: 0;
+    }
+
+    .container {
+      box-shadow: none;
+    }
+  </style>
+</body>
+</html>

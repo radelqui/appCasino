@@ -30,7 +30,16 @@
       "Bash(node:*)",
       "Bash(npx electron:*)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(nul)",
+      "Bash(/tmp/config-old.html)",
+      "Bash(/tmp/auditor-old.html)",
+      "Bash(git log:*)",
+      "Bash(comm -23:*)",
+      "Bash(test:*)",
+      "Bash(npm rebuild:*)",
+      "Bash(taskkill:*)",
+      "Bash(del nul 2)"
     ],
     "deny": [],
     "ask": []

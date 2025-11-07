@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Caja</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+            padding: 20px;
+            min-height: 100vh;
+        }
+        .header {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .btn-primary { background: #007bff; color: white; }
+        .btn-danger { background: #dc3545; color: white; }
+        .content {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>💰 CAJA</h1>
+        <div>
+            <button class="btn btn-primary" id="backBtn">Volver al Panel</button>
+            <button class="btn" id="viewAuditBtn">Ver Auditoría</button>
+            <button class="btn btn-danger" id="exitBtn">Salir</button>
+        </div>
+    </div>
+
+    <div class="content">
+        <h2>💰 Sistema de Validación y Pago</h2>
+
+        <!-- Buscar Voucher -->
+        <div style="margin: 20px 0; padding: 20px; background: #f8f9fa; border-radius: 10px;">
+            <h3>Buscar Voucher</h3>
+            <div style="display: flex; gap: 10px; margin-top: 15px;">
+                <input type="text" id="searchCode" placeholder="Escanea o ingresa código QR"
+                       style="flex: 1; padding: 12px; border: 2px solid #ddd; border-radius: 5px; font-size: 16px;">
+                <button class="btn btn-primary" id="btnBuscar" style="padding: 12px 30px;">🔍 Buscar</button>
+            </div>
+        </div>
+
+        <!-- Resultado -->
+        <div id="resultado" style="margin: 20px 0; padding: 20px; border-radius: 10px; display: none;">
+            <!-- Se llenará dinámicamente con JavaScript -->
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('backBtn').addEventListener('click', async () => {
+            try {
+                await window.api?.openView?.('panel');
+            } catch (e) {
+                console.error('Error:', e);
+            }
+        });
+
+        document.getElementById('viewAuditBtn').addEventListener('click', () => {
+            try {
+                window.api?.openView?.('reportes');
+            } catch (e) {
+                console.error('Error:', e);
+            }
+        });
+
+        document.getElementById('exitBtn').addEventListener('click', () => {
+            try {
+                window.api?.exitApp?.();
+            } catch (e) {
+                console.error('Error:', e);
+            }
+        });
+
+        // Buscar voucher
+        document.getElementById('btnBuscar').addEventListener('click', buscarVoucher);
+        document.getElementById('searchCode').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') buscarVoucher();
+        });
+
+        async function buscarVoucher() {
+            const code = document.getElementById('searchCode').value.trim();
+            const resultado = document.getElementById('resultado');
+
+            if (!code) {
+                alert('Por favor ingresa un código');
+                return;
+            }
+
+            resultado.style.display = 'block';
+            resultado.innerHTML = '<p>🔄 Buscando voucher...</p>';
+
+            try {
+                const voucher = await window.api?.invoke?.('caja:get-ticket', code);
+
+                if (!voucher) {
+                    resultado.style.background = '#fff3cd';
+                    resultado.innerHTML = '<p style="color: #856404;">⚠️ Voucher no encontrado</p>';
+                    return;
+                }
+
+                if (voucher.estado === 'redeemed' || voucher.estado === 'canjeado') {
+                    resultado.style.background = '#f8d7da';
+                    resultado.innerHTML = `
+                        <h3 style="color: #721c24;">❌ Voucher Ya Usado</h3>
+                        <p>Código: ${voucher.code}</p>
+                        <p>Usado el: ${new Date(voucher.used_at).toLocaleString('es-DO')}</p>
+                    `;
+                    return;
+                }
+
+                // Voucher válido
+                resultado.style.background = '#d4edda';
+                resultado.innerHTML = `
+                    <h3 style="color: #155724;">✅ Voucher Válido</h3>
+                    <p><strong>Código:</strong> ${voucher.code}</p>
+                    <p><strong>Monto:</strong> ${voucher.currency} $${voucher.amount}</p>
+                    <p><strong>Creado:</strong> ${new Date(voucher.created_at).toLocaleString('es-DO')}</p>
+                    <p><strong>Mesa:</strong> ${voucher.mesa || 'N/A'}</p>
+                    <button class="btn" id="btnPagar"
+                            style="background: #28a745; color: white; padding: 15px 40px; font-size: 18px; margin-top: 15px;">
+                        💵 PAGAR ${voucher.currency} $${voucher.amount}
+                    </button>
+                `;
+
+                // Agregar evento al botón pagar
+                document.getElementById('btnPagar').addEventListener('click', () => pagarVoucher(voucher));
+
+            } catch (e) {
+                resultado.style.background = '#f8d7da';
+                resultado.innerHTML = `<p style="color: #721c24;">❌ Error: ${e.message}</p>`;
+            }
+        }
+
+        async function pagarVoucher(voucher) {
+            if (!confirm(`¿Confirmar pago de ${voucher.currency} $${voucher.amount}?`)) return;
+
+            try {
+                const result = await window.api?.invoke?.('caja:redeem-ticket', voucher.code);
+
+                if (result.success) {
+                    alert('✅ Pago procesado exitosamente');
+                    document.getElementById('searchCode').value = '';
+                    document.getElementById('resultado').style.display = 'none';
+                } else {
+                    alert('❌ Error: ' + (result.error || 'Error desconocido'));
+                }
+            } catch (e) {
+                alert('❌ Error procesando pago: ' + e.message);
+            }
+        }
+
+        console.log('✅ Caja con validación de vouchers cargada');
+    </script>
+</body>
+</html>

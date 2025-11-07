@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld('api', {
   getStats: (dateRange) => ipcRenderer.invoke('get-stats', dateRange),
   // Compat: estadísticas del día para Panel
   getStatsToday: () => ipcRenderer.invoke('get-stats-today'),
+  getRecentTickets: (limit) => ipcRenderer.invoke('get-recent-tickets', limit),
   forceSync: () => ipcRenderer.invoke('force-sync'),
   testPrinter: () => ipcRenderer.invoke('test-print'),
   testCalibration: () => ipcRenderer.invoke('test-calibration'),

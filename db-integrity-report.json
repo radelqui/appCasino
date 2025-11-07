@@ -1,0 +1,163 @@
+{
+  "timestamp": "2025-10-31T23:28:19.773Z",
+  "tables": {
+    "vouchers": {
+      "status": "✅ EXISTE",
+      "columns": [
+        "id",
+        "voucher_code",
+        "qr_data",
+        "qr_hash",
+        "amount",
+        "currency",
+        "status",
+        "issued_by_user_id",
+        "issued_at_station_id",
+        "issued_at",
+        "redeemed_by_user_id",
+        "redeemed_at_station_id",
+        "redeemed_at",
+        "expires_at",
+        "customer_name",
+        "customer_notes",
+        "created_at",
+        "updated_at",
+        "mesa_nombre",
+        "operador_nombre"
+      ],
+      "sample_columns": "id, voucher_code, qr_data, qr_hash, amount, currency, status, issued_by_user_id, issued_at_station_id, issued_at, redeemed_by_user_id, redeemed_at_station_id, redeemed_at, expires_at, customer_name, customer_notes, created_at, updated_at, mesa_nombre, operador_nombre",
+      "required_fields": [
+        "id",
+        "voucher_code",
+        "amount",
+        "currency",
+        "status",
+        "qr_data",
+        "qr_hash",
+        "issued_at",
+        "created_at",
+        "updated_at"
+      ],
+      "present_fields": [
+        "id",
+        "voucher_code",
+        "qr_data",
+        "qr_hash",
+        "amount",
+        "currency",
+        "status",
+        "issued_by_user_id",
+        "issued_at_station_id",
+        "issued_at",
+        "redeemed_by_user_id",
+        "redeemed_at_station_id",
+        "redeemed_at",
+        "expires_at",
+        "customer_name",
+        "customer_notes",
+        "created_at",
+        "updated_at",
+        "mesa_nombre",
+        "operador_nombre"
+      ],
+      "missing_fields": [],
+      "fields_status": "✅ COMPLETO"
+    },
+    "users": {
+      "status": "✅ EXISTE",
+      "columns": [
+        "id",
+        "email",
+        "full_name",
+        "role",
+        "station_id",
+        "is_active",
+        "created_at",
+        "updated_at",
+        "pin_code"
+      ],
+      "record_count": 9
+    },
+    "operadores": {
+      "status": "✅ EXISTE",
+      "columns": [
+        "id",
+        "nombre",
+        "activo",
+        "mesas_asignadas",
+        "created_at",
+        "updated_at",
+        "codigo",
+        "pin",
+        "mesa_asignada"
+      ],
+      "record_count": 3
+    },
+    "stations": {
+      "status": "✅ EXISTE",
+      "columns": [
+        "id",
+        "station_type",
+        "station_number",
+        "station_name",
+        "is_active",
+        "created_at",
+        "updated_at"
+      ],
+      "record_count": 5
+    }
+  },
+  "triggers": {},
+  "indexes": {
+    "note": "Verificación limitada - se requiere acceso directo a PostgreSQL para ver índices completos",
+    "recommended": {
+      "vouchers": [
+        "voucher_code",
+        "status",
+        "issued_at",
+        "created_at"
+      ],
+      "users": [
+        "email",
+        "role"
+      ],
+      "operadores": [
+        "codigo",
+        "activo"
+      ],
+      "stations": [
+        "station_number",
+        "is_active"
+      ]
+    }
+  },
+  "rls": {
+    "vouchers": {
+      "anon_access": "⚠️ PERMITIDO (revisar)",
+      "error": "Sin error"
+    }
+  },
+  "performance": {
+    "query_by_code": {
+      "time_ms": 97,
+      "status": "✅ RÁPIDO"
+    },
+    "query_active": {
+      "time_ms": 92,
+      "status": "✅ RÁPIDO"
+    },
+    "query_count": {
+      "time_ms": 133,
+      "status": "✅ RÁPIDO"
+    }
+  },
+  "recommendations": [
+    "Revisar políticas RLS en tabla vouchers"
+  ],
+  "statistics": {
+    "total_vouchers": 39,
+    "active_vouchers": 19,
+    "redeemed_vouchers": 20,
+    "redemption_rate": "51.28%"
+  }
+}

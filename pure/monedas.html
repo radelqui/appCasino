@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Monedas y Valores</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+      background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 12px;
+      padding: 30px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 30px;
+      padding-bottom: 20px;
+      border-bottom: 2px solid #e2e8f0;
+    }
+
+    h1 {
+      font-size: 28px;
+      color: #1e293b;
+      margin-bottom: 8px;
+    }
+
+    h2 {
+      font-size: 20px;
+      color: #1e293b;
+      margin-bottom: 15px;
+    }
+
+    h3 {
+      font-size: 16px;
+      color: #334155;
+      margin: 0;
+    }
+
+    h4 {
+      font-size: 15px;
+      color: #475569;
+      margin-bottom: 10px;
+    }
+
+    .subtitle {
+      color: #64748b;
+      font-size: 14px;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      font-size: 14px;
+      transition: all 0.2s;
+      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
+    }
+
+    .btn-secondary {
+      background: white;
+      color: #475569;
+      border: 2px solid #cbd5e1;
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      font-size: 14px;
+      transition: all 0.2s;
+    }
+
+    .btn-secondary:hover {
+      background: #f8fafc;
+      border-color: #94a3b8;
+    }
+
+    .section {
+      background: #f8fafc;
+      padding: 20px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+    }
+
+    .currency-card {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      margin-bottom: 15px;
+      border-left: 4px solid #3b82f6;
+    }
+
+    .currency-card.usd {
+      border-left-color: #10b981;
+    }
+
+    .currency-card.dop {
+      border-left-color: #3b82f6;
+    }
+
+    .preset-values {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+      gap: 10px;
+      margin-top: 15px;
+    }
+
+    .preset-btn {
+      padding: 12px;
+      background: #f1f5f9;
+      border: 2px solid #cbd5e1;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      position: relative;
+      transition: all 0.2s;
+      text-align: center;
+    }
+
+    .preset-btn:hover {
+      background: #e2e8f0;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+
+    .preset-btn .remove {
+      position: absolute;
+      top: -8px;
+      right: -8px;
+      background: #ef4444;
+      color: white;
+      border-radius: 50%;
+      width: 20px;
+      height: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      cursor: pointer;
+      font-weight: bold;
+      line-height: 1;
+      transition: all 0.2s;
+    }
+
+    .preset-btn .remove:hover {
+      background: #dc2626;
+      transform: scale(1.1);
+    }
+
+    .toggle-switch {
+      position: relative;
+      display: inline-block;
+      width: 50px;
+      height: 24px;
+    }
+
+    .toggle-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: #cbd5e1;
+      transition: .4s;
+      border-radius: 24px;
+    }
+
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 16px;
+      width: 16px;
+      left: 4px;
+      bottom: 4px;
+      background-color: white;
+      transition: .4s;
+      border-radius: 50%;
+    }
+
+    input:checked + .slider {
+      background-color: #10b981;
+    }
+
+    input:checked + .slider:before {
+      transform: translateX(26px);
+    }
+
+    .form-input {
+      width: 100%;
+      padding: 10px;
+      border: 2px solid #cbd5e1;
+      border-radius: 8px;
+      font-size: 14px;
+      transition: all 0.2s;
+    }
+
+    .form-input:focus {
+      outline: none;
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+
+    label {
+      display: block;
+      margin-bottom: 6px;
+      color: #475569;
+      font-weight: 600;
+      font-size: 13px;
+    }
+
+    .info-badge {
+      display: inline-block;
+      padding: 6px 12px;
+      background: #dbeafe;
+      color: #1e40af;
+      border-radius: 6px;
+      font-size: 12px;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div>
+        <h1>💰 Monedas y Valores</h1>
+        <p class="subtitle">Configurar monedas aceptadas y valores preestablecidos</p>
+      </div>
+      <div style="display: flex; gap: 10px;">
+        <button onclick="guardarConfiguracion()" class="btn-primary">💾 Guardar Cambios</button>
+        <button onclick="volverConfig()" class="btn-secondary">← Volver</button>
+      </div>
+    </div>
+
+    <!-- Moneda USD -->
+    <div class="section">
+      <h2>💵 Dólares Estadounidenses (USD)</h2>
+
+      <div class="currency-card usd">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+          <div>
+            <h3>Estado de la Moneda</h3>
+            <p style="margin: 5px 0 0 0; color: #64748b; font-size: 13px;">Activar/desactivar esta moneda en el sistema</p>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="usd-enabled" checked>
+            <span class="slider"></span>
+          </label>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 20px;">
+          <div>
+            <label for="usd-min">Valor Mínimo (USD):</label>
+            <input type="number" id="usd-min" value="5" min="0" step="0.01" class="form-input">
+          </div>
+          <div>
+            <label for="usd-max">Valor Máximo (USD):</label>
+            <input type="number" id="usd-max" value="10000" min="0" step="0.01" class="form-input">
+          </div>
+          <div>
+            <label for="usd-decimals">Decimales a Mostrar:</label>
+            <select id="usd-decimals" class="form-input">
+              <option value="0">Sin decimales</option>
+              <option value="2" selected>2 decimales (.00)</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <h4>Valores Preestablecidos (Botones Rápidos)</h4>
+          <p style="color: #64748b; font-size: 13px; margin-bottom: 10px;">
+            Valores que aparecerán como botones rápidos en la emisión de tickets
+          </p>
+          <div id="usd-presets" class="preset-values">
+            <!-- Se llena dinámicamente -->
+          </div>
+          <button onclick="agregarValor('USD')" class="btn-secondary" style="margin-top: 10px;">
+            ➕ Agregar Valor Personalizado
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Moneda DOP -->
+    <div class="section">
+      <h2>💳 Pesos Dominicanos (DOP)</h2>
+
+      <div class="currency-card dop">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+          <div>
+            <h3>Estado de la Moneda</h3>
+            <p style="margin: 5px 0 0 0; color: #64748b; font-size: 13px;">Activar/desactivar esta moneda en el sistema</p>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="dop-enabled" checked>
+            <span class="slider"></span>
+          </label>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 20px;">
+          <div>
+            <label for="dop-min">Valor Mínimo (DOP):</label>
+            <input type="number" id="dop-min" value="50" min="0" step="0.01" class="form-input">
+          </div>
+          <div>
+            <label for="dop-max">Valor Máximo (DOP):</label>
+            <input type="number" id="dop-max" value="500000" min="0" step="0.01" class="form-input">
+          </div>
+          <div>
+            <label for="dop-decimals">Decimales a Mostrar:</label>
+            <select id="dop-decimals" class="form-input">
+              <option value="0">Sin decimales</option>
+              <option value="2" selected>2 decimales (.00)</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <h4>Valores Preestablecidos (Botones Rápidos)</h4>
+          <p style="color: #64748b; font-size: 13px; margin-bottom: 10px;">
+            Valores que aparecerán como botones rápidos en la emisión de tickets
+          </p>
+          <div id="dop-presets" class="preset-values">
+            <!-- Se llena dinámicamente -->
+          </div>
+          <button onclick="agregarValor('DOP')" class="btn-secondary" style="margin-top: 10px;">
+            ➕ Agregar Valor Personalizado
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tipo de cambio -->
+    <div class="section">
+      <h2>🔄 Tipo de Cambio</h2>
+      <div class="currency-card">
+        <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 15px; align-items: start;">
+          <div>
+            <label for="exchange-rate">1 USD equivale a:</label>
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <input type="number" id="exchange-rate" value="58.50" min="0" step="0.01" class="form-input">
+              <span style="font-weight: 600; color: #475569;">DOP</span>
+            </div>
+          </div>
+          <div>
+            <label>Información:</label>
+            <div class="info-badge">
+              ℹ️ El tipo de cambio se usa solo para referencia y reportes. No afecta los montos de los tickets.
+            </div>
+            <p style="margin: 10px 0 0 0; color: #64748b; font-size: 13px;">
+              Actualizado: <span id="exchange-updated">Configuración Manual</span>
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let config = {
+      USD: {
+        enabled: true,
+        min: 5,
+        max: 10000,
+        decimals: 2,
+        presets: [20, 50, 100, 200, 500, 1000]
+      },
+      DOP: {
+        enabled: true,
+        min: 50,
+        max: 500000,
+        decimals: 2,
+        presets: [100, 500, 1000, 2000, 5000, 10000]
+      },
+      exchangeRate: 58.50,
+      lastUpdated: new Date().toISOString()
+    };
+
+    async function init() {
+      try {
+        console.log('💰 Inicializando configuración de monedas...');
+
+        // Cargar configuración guardada
+        const result = await window.api.invoke('currency:get-config');
+
+        if (result.success && result.config) {
+          config = result.config;
+          console.log('✅ Configuración cargada:', config);
+        } else {
+          console.log('ℹ️ Usando configuración por defecto');
+        }
+
+        // Aplicar a interfaz
+        aplicarConfig();
+        mostrarPresets('USD');
+        mostrarPresets('DOP');
+
+      } catch (error) {
+        console.error('❌ Error inicializando:', error);
+        alert('Error cargando configuración: ' + error.message);
+      }
+    }
+
+    function aplicarConfig() {
+      // USD
+      document.getElementById('usd-enabled').checked = config.USD.enabled;
+      document.getElementById('usd-min').value = config.USD.min;
+      document.getElementById('usd-max').value = config.USD.max;
+      document.getElementById('usd-decimals').value = config.USD.decimals;
+
+      // DOP
+      document.getElementById('dop-enabled').checked = config.DOP.enabled;
+      document.getElementById('dop-min').value = config.DOP.min;
+      document.getElementById('dop-max').value = config.DOP.max;
+      document.getElementById('dop-decimals').value = config.DOP.decimals;
+
+      // Tipo de cambio
+      document.getElementById('exchange-rate').value = config.exchangeRate;
+
+      // Actualizar fecha
+      if (config.lastUpdated) {
+        const date = new Date(config.lastUpdated);
+        document.getElementById('exchange-updated').textContent = date.toLocaleString('es-DO');
+      }
+    }
+
+    function mostrarPresets(currency) {
+      const container = document.getElementById(`${currency.toLowerCase()}-presets`);
+      container.innerHTML = '';
+
+      const symbol = currency === 'USD' ? '$' : 'RD$';
+
+      // Ordenar valores de menor a mayor
+      config[currency].presets.sort((a, b) => a - b).forEach((value) => {
+        const btn = document.createElement('div');
+        btn.className = 'preset-btn';
+        btn.innerHTML = `
+          ${symbol}${formatNumber(value, config[currency].decimals)}
+          <div class="remove" onclick="eliminarValor('${currency}', ${value})">×</div>
+        `;
+        container.appendChild(btn);
+      });
+    }
+
+    function formatNumber(num, decimals) {
+      return Number(num).toFixed(decimals);
+    }
+
+    function agregarValor(currency) {
+      const symbol = currency === 'USD' ? 'USD' : 'DOP';
+      const valor = prompt(`Ingrese el valor en ${symbol}:\n\nEjemplo: ${currency === 'USD' ? '50' : '500'}`);
+
+      if (!valor) return;
+
+      const num = parseFloat(valor);
+
+      if (isNaN(num) || num <= 0) {
+        alert('❌ Valor inválido. Debe ser un número mayor a 0.');
+        return;
+      }
+
+      // Verificar si ya existe
+      if (config[currency].presets.includes(num)) {
+        alert('⚠️ Este valor ya existe en la lista.');
+        return;
+      }
+
+      // Verificar límites
+      if (num < config[currency].min) {
+        alert(`⚠️ El valor debe ser mayor o igual al mínimo (${config[currency].min})`);
+        return;
+      }
+
+      if (num > config[currency].max) {
+        alert(`⚠️ El valor debe ser menor o igual al máximo (${config[currency].max})`);
+        return;
+      }
+
+      config[currency].presets.push(num);
+      mostrarPresets(currency);
+    }
+
+    function eliminarValor(currency, value) {
+      if (!confirm(`¿Eliminar el valor ${currency === 'USD' ? '$' : 'RD$'}${value}?`)) return;
+
+      const index = config[currency].presets.indexOf(value);
+      if (index > -1) {
+        config[currency].presets.splice(index, 1);
+        mostrarPresets(currency);
+      }
+    }
+
+    async function guardarConfiguracion() {
+      try {
+        // Recopilar datos de la interfaz
+        config.USD.enabled = document.getElementById('usd-enabled').checked;
+        config.USD.min = parseFloat(document.getElementById('usd-min').value);
+        config.USD.max = parseFloat(document.getElementById('usd-max').value);
+        config.USD.decimals = parseInt(document.getElementById('usd-decimals').value);
+
+        config.DOP.enabled = document.getElementById('dop-enabled').checked;
+        config.DOP.min = parseFloat(document.getElementById('dop-min').value);
+        config.DOP.max = parseFloat(document.getElementById('dop-max').value);
+        config.DOP.decimals = parseInt(document.getElementById('dop-decimals').value);
+
+        config.exchangeRate = parseFloat(document.getElementById('exchange-rate').value);
+        config.lastUpdated = new Date().toISOString();
+
+        // Validaciones
+        if (!config.USD.enabled && !config.DOP.enabled) {
+          alert('⚠️ Debe haber al menos una moneda activa');
+          return;
+        }
+
+        if (config.USD.min >= config.USD.max) {
+          alert('⚠️ El valor mínimo de USD debe ser menor que el máximo');
+          return;
+        }
+
+        if (config.DOP.min >= config.DOP.max) {
+          alert('⚠️ El valor mínimo de DOP debe ser menor que el máximo');
+          return;
+        }
+
+        if (config.exchangeRate <= 0) {
+          alert('⚠️ El tipo de cambio debe ser mayor a 0');
+          return;
+        }
+
+        // Guardar
+        console.log('💾 Guardando configuración:', config);
+        const result = await window.api.invoke('currency:save-config', config);
+
+        if (result.success) {
+          alert('✅ Configuración guardada correctamente');
+          aplicarConfig(); // Actualizar fecha en UI
+        } else {
+          throw new Error(result.error);
+        }
+
+      } catch (error) {
+        console.error('❌ Error guardando:', error);
+        alert('❌ Error al guardar: ' + error.message);
+      }
+    }
+
+    function volverConfig() {
+      window.api.invoke('open-view', 'config');
+    }
+
+    // Inicializar al cargar
+    init();
+  </script>
+</body>
+</html>

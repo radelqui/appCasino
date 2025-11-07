@@ -60,7 +60,7 @@
       </div>
     </section>
 
-    <!-- Configuración del Sistema (Próximamente) -->
+    <!-- Configuración del Sistema -->
     <section class="card">
       <h2>🔧 Configuración del Sistema</h2>
       <p>Ajustes generales del sistema, base de datos, e impresoras</p>
@@ -75,45 +75,45 @@
           </div>
         </div>
 
-        <div class="config-item" style="opacity:0.6;cursor:not-allowed">
+        <div class="config-item" onclick="abrirImpresoras()">
           <div class="config-icon">🖨️</div>
-          <div class="config-title">Impresoras <span class="badge soon">Próximamente</span></div>
+          <div class="config-title">Impresoras <span class="badge active">Activo</span></div>
           <div class="config-desc">
             Configurar impresoras térmicas de tickets.
             Ajustar tamaños de papel y perfiles de impresión.
           </div>
         </div>
 
-        <div class="config-item" style="opacity:0.6;cursor:not-allowed">
+        <div class="config-item" onclick="abrirDatabase()">
           <div class="config-icon">💾</div>
-          <div class="config-title">Base de Datos <span class="badge soon">Próximamente</span></div>
+          <div class="config-title">Base de Datos <span class="badge active">Activo</span></div>
           <div class="config-desc">
             Configurar conexión a Supabase.
             Backup y restauración de datos.
           </div>
         </div>
 
-        <div class="config-item" style="opacity:0.6;cursor:not-allowed">
+        <div class="config-item" onclick="abrirMonedas()">
           <div class="config-icon">💰</div>
-          <div class="config-title">Monedas y Valores <span class="badge soon">Próximamente</span></div>
+          <div class="config-title">Monedas y Valores <span class="badge active">Activo</span></div>
           <div class="config-desc">
             Configurar monedas aceptadas (DOP, USD).
             Valores por defecto para emisión de tickets.
           </div>
         </div>
 
-        <div class="config-item" style="opacity:0.6;cursor:not-allowed">
+        <div class="config-item" onclick="abrirLogs()">
           <div class="config-icon">📊</div>
-          <div class="config-title">Logs del Sistema <span class="badge soon">Próximamente</span></div>
+          <div class="config-title">Logs del Sistema <span class="badge active">Activo</span></div>
           <div class="config-desc">
             Ver historial de acciones del sistema.
             Auditoría de cambios y errores.
           </div>
         </div>
 
-        <div class="config-item" style="opacity:0.6;cursor:not-allowed">
+        <div class="config-item" onclick="abrirSeguridad()">
           <div class="config-icon">🔐</div>
-          <div class="config-title">Seguridad <span class="badge soon">Próximamente</span></div>
+          <div class="config-title">Seguridad <span class="badge active">Activo</span></div>
           <div class="config-desc">
             Configurar políticas de seguridad.
             Gestión de sesiones y autenticación.
@@ -157,10 +157,12 @@
     document.getElementById('btnVolver').addEventListener('click', async () => {
       console.log('🔙 Volviendo al panel...');
       try {
-        await window.api?.invoke?.('open-view', 'panel');
+        const result = await window.api?.invoke?.('open-view', 'panel');
+        if (!result?.success) {
+          console.error('❌ Error abriendo panel:', result?.error);
+        }
       } catch (error) {
-        console.error('Error volviendo al panel:', error);
-        window.location.href = '../Caja/panel.html';
+        console.error('❌ Error volviendo al panel:', error);
       }
     });
 
@@ -195,6 +197,91 @@
       } catch (error) {
         console.error('❌ Error:', error);
         alert('Error al abrir gestión de usuarios');
+      }
+    }
+
+    // ============================================
+    // ABRIR MÓDULO DE IMPRESORAS
+    // ============================================
+    async function abrirImpresoras() {
+      console.log('🖨️ Abriendo configuración de impresoras...');
+      try {
+        const result = await window.api?.invoke?.('open-view', 'impresoras');
+        if (!result?.success) {
+          console.error('❌ Error abriendo impresoras:', result?.error);
+          alert('Error al abrir configuración de impresoras');
+        }
+      } catch (error) {
+        console.error('❌ Error:', error);
+        alert('Error al abrir configuración de impresoras');
+      }
+    }
+
+    // ============================================
+    // ABRIR MÓDULO DE BASE DE DATOS
+    // ============================================
+    async function abrirDatabase() {
+      console.log('💾 Abriendo configuración de base de datos...');
+      try {
+        const result = await window.api?.invoke?.('open-view', 'database');
+        if (!result?.success) {
+          console.error('❌ Error abriendo database:', result?.error);
+          alert('Error al abrir configuración de base de datos');
+        }
+      } catch (error) {
+        console.error('❌ Error:', error);
+        alert('Error al abrir configuración de base de datos');
+      }
+    }
+
+    // ============================================
+    // ABRIR MÓDULO DE MONEDAS
+    // ============================================
+    async function abrirMonedas() {
+      console.log('💰 Abriendo configuración de monedas...');
+      try {
+        const result = await window.api?.invoke?.('open-view', 'monedas');
+        if (!result?.success) {
+          console.error('❌ Error abriendo monedas:', result?.error);
+          alert('Error al abrir configuración de monedas');
+        }
+      } catch (error) {
+        console.error('❌ Error:', error);
+        alert('Error al abrir configuración de monedas');
+      }
+    }
+
+    // ============================================
+    // ABRIR MÓDULO DE LOGS
+    // ============================================
+    async function abrirLogs() {
+      console.log('📊 Abriendo logs del sistema...');
+      try {
+        const result = await window.api?.invoke?.('open-view', 'logs');
+        if (!result?.success) {
+          console.error('❌ Error abriendo logs:', result?.error);
+          alert('Error al abrir logs del sistema');
+        }
+      } catch (error) {
+        console.error('❌ Error:', error);
+        alert('Error al abrir logs del sistema');
+      }
+    }
+
+    // ============================================
+    // ABRIR MÓDULO DE SEGURIDAD
+    // ============================================
+    async function abrirSeguridad() {
+      console.log('🔐 Abriendo configuración de seguridad...');
+      try {
+        const result = await window.api?.invoke?.('open-view', 'seguridad');
+        if (!result?.success) {
+          console.error('❌ Error abriendo seguridad:', result?.error);
+          alert('Error al abrir configuración de seguridad');
+        }
+      } catch (error) {
+        console.error('❌ Error:', error);
+        alert('Error al abrir configuración de seguridad');
       }
     }
 

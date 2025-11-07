@@ -1,0 +1,779 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Base de Datos - Sistema TITO</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 12px;
+      padding: 30px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 30px;
+      padding-bottom: 20px;
+      border-bottom: 2px solid #e5e7eb;
+    }
+
+    .header h1 {
+      margin: 0;
+      color: #1e293b;
+      font-size: 28px;
+    }
+
+    .header p {
+      margin: 5px 0 0 0;
+      color: #64748b;
+      font-size: 14px;
+    }
+
+    .section {
+      margin-bottom: 30px;
+      padding: 20px;
+      background: #f8fafc;
+      border-radius: 8px;
+      border: 1px solid #e2e8f0;
+    }
+
+    .section h3 {
+      margin-top: 0;
+      color: #1e40af;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 18px;
+    }
+
+    .status-badge {
+      padding: 6px 16px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .status-online {
+      background: #dcfce7;
+      color: #166534;
+    }
+
+    .status-offline {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+
+    .info-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 15px;
+    }
+
+    .info-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 12px;
+      background: white;
+      border-radius: 6px;
+      border-left: 3px solid #3b82f6;
+    }
+
+    .info-label {
+      font-weight: 500;
+      color: #64748b;
+    }
+
+    .info-value {
+      font-weight: 600;
+      color: #1e293b;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+      margin-top: 15px;
+    }
+
+    .stat-card {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      text-align: center;
+      border-top: 3px solid #3b82f6;
+    }
+
+    .stat-value {
+      font-size: 32px;
+      font-weight: bold;
+      color: #1e40af;
+    }
+
+    .stat-label {
+      font-size: 13px;
+      color: #64748b;
+      margin-top: 5px;
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 15px;
+    }
+
+    .btn {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      transition: all 0.2s;
+    }
+
+    .btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .btn-primary {
+      background: #3b82f6;
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: #2563eb;
+    }
+
+    .btn-success {
+      background: #10b981;
+      color: white;
+    }
+
+    .btn-success:hover {
+      background: #059669;
+    }
+
+    .btn-warning {
+      background: #f59e0b;
+      color: white;
+    }
+
+    .btn-warning:hover {
+      background: #d97706;
+    }
+
+    .btn-danger {
+      background: #ef4444;
+      color: white;
+    }
+
+    .btn-danger:hover {
+      background: #dc2626;
+    }
+
+    .btn-secondary {
+      background: #64748b;
+      color: white;
+    }
+
+    .btn-secondary:hover {
+      background: #475569;
+    }
+
+    .backup-list {
+      margin-top: 15px;
+    }
+
+    .backup-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px;
+      background: white;
+      border-radius: 6px;
+      margin-bottom: 8px;
+      border-left: 3px solid #3b82f6;
+    }
+
+    .backup-info {
+      flex: 1;
+    }
+
+    .backup-name {
+      font-weight: 600;
+      color: #1e293b;
+      margin-bottom: 4px;
+    }
+
+    .backup-meta {
+      font-size: 12px;
+      color: #64748b;
+    }
+
+    .backup-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .progress-bar {
+      width: 100%;
+      height: 30px;
+      background: #e5e7eb;
+      border-radius: 15px;
+      overflow: hidden;
+      margin-top: 10px;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #3b82f6, #2563eb);
+      transition: width 0.3s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: 600;
+      font-size: 13px;
+    }
+
+    .alert {
+      padding: 12px 16px;
+      border-radius: 6px;
+      margin-top: 15px;
+      font-size: 14px;
+    }
+
+    .alert-info {
+      background: #dbeafe;
+      color: #1e40af;
+      border-left: 4px solid #3b82f6;
+    }
+
+    .alert-warning {
+      background: #fef3c7;
+      color: #92400e;
+      border-left: 4px solid #f59e0b;
+    }
+
+    .alert-success {
+      background: #dcfce7;
+      color: #166534;
+      border-left: 4px solid #10b981;
+    }
+
+    @media (max-width: 768px) {
+      .info-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 15px;
+      }
+
+      .backup-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div>
+        <h1>💾 Base de Datos</h1>
+        <p>Gestión de conexión, backups y sincronización</p>
+      </div>
+      <button onclick="volverConfig()" class="btn btn-secondary">← Volver</button>
+    </div>
+
+    <!-- Estado de Supabase -->
+    <div class="section">
+      <h3>☁️ Supabase (Nube - Fuente de Verdad)</h3>
+      <div class="info-grid">
+        <div class="info-item">
+          <span class="info-label">Estado:</span>
+          <span id="supabase-status" class="status-badge">Verificando...</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">Proyecto:</span>
+          <span class="info-value" id="supabase-url">-</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">Latencia:</span>
+          <span class="info-value" id="supabase-latency">-</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">Última sync:</span>
+          <span class="info-value" id="supabase-last-sync">-</span>
+        </div>
+      </div>
+      <div class="actions">
+        <button onclick="probarConexion()" class="btn btn-primary">🔌 Probar Conexión</button>
+        <button onclick="forzarSync()" class="btn btn-success">🔄 Sincronizar Ahora</button>
+      </div>
+      <div id="sync-progress" style="display: none;">
+        <div class="progress-bar">
+          <div id="sync-progress-fill" class="progress-fill" style="width: 0%">0%</div>
+        </div>
+        <p id="sync-status" style="margin-top: 10px; color: #64748b;"></p>
+      </div>
+    </div>
+
+    <!-- Estado de SQLite -->
+    <div class="section">
+      <h3>📁 SQLite Local (Caché Offline)</h3>
+      <div class="info-grid">
+        <div class="info-item">
+          <span class="info-label">Ubicación:</span>
+          <span class="info-value" id="sqlite-path" style="font-size: 12px; word-break: break-all;">-</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">Tamaño:</span>
+          <span class="info-value" id="sqlite-size">-</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">Tickets locales:</span>
+          <span class="info-value" id="sqlite-tickets">-</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">Pendientes sync:</span>
+          <span class="info-value" id="sqlite-pending" style="color: #f59e0b;">-</span>
+        </div>
+      </div>
+      <div class="actions">
+        <button onclick="verArchivo()" class="btn btn-secondary">📂 Abrir Carpeta</button>
+        <button onclick="limpiarCache()" class="btn btn-warning">🧹 Limpiar Caché</button>
+      </div>
+      <div class="alert alert-info">
+        <strong>ℹ️ Info:</strong> SQLite actúa como caché local para operación offline. Supabase es la fuente de verdad.
+      </div>
+    </div>
+
+    <!-- Estadísticas -->
+    <div class="section">
+      <h3>📊 Estadísticas Generales (Supabase)</h3>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-value" id="stat-vouchers">
+            <span style="font-size: 16px;">⏳</span>
+          </div>
+          <div class="stat-label">Total Tickets</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="stat-users">
+            <span style="font-size: 16px;">⏳</span>
+          </div>
+          <div class="stat-label">Usuarios</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="stat-operators">
+            <span style="font-size: 16px;">⏳</span>
+          </div>
+          <div class="stat-label">Operadores</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="stat-logs">
+            <span style="font-size: 16px;">⏳</span>
+          </div>
+          <div class="stat-label">Logs Auditoría</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Backups -->
+    <div class="section">
+      <h3>💾 Backups de SQLite Local</h3>
+      <div class="actions">
+        <button onclick="crearBackup()" class="btn btn-success">💾 Crear Backup Ahora</button>
+        <button onclick="restaurarBackup()" class="btn btn-primary">📥 Restaurar desde Archivo</button>
+        <button onclick="vaciarLogs()" class="btn btn-warning">🗑️ Vaciar Logs Antiguos (&gt;90d)</button>
+      </div>
+      <div id="backup-list" class="backup-list">
+        <p style="text-align: center; color: #64748b; padding: 20px;">Cargando backups...</p>
+      </div>
+      <div class="alert alert-warning">
+        <strong>⚠️ Advertencia:</strong> Los backups solo guardan la base de datos SQLite local. Para backup completo del sistema, use las herramientas de Supabase.
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ============================================
+    // INICIALIZACIÓN
+    // ============================================
+    async function init() {
+      console.log('💾 Módulo de Base de Datos cargado');
+      await verificarEstado();
+      await cargarEstadisticas();
+      await cargarBackups();
+    }
+
+    // ============================================
+    // VERIFICAR ESTADO DE CONEXIONES
+    // ============================================
+    async function verificarEstado() {
+      try {
+        // Estado Supabase
+        const statusSupabase = await window.api.invoke('check-supabase-status');
+
+        const statusBadge = document.getElementById('supabase-status');
+        if (statusSupabase.connected) {
+          statusBadge.textContent = '✅ Conectado';
+          statusBadge.className = 'status-badge status-online';
+        } else {
+          statusBadge.textContent = '❌ Desconectado';
+          statusBadge.className = 'status-badge status-offline';
+        }
+
+        document.getElementById('supabase-url').textContent = statusSupabase.url || '-';
+        document.getElementById('supabase-latency').textContent = statusSupabase.latency ? `${statusSupabase.latency}ms` : '-';
+        document.getElementById('supabase-last-sync').textContent = statusSupabase.lastSync || '-';
+
+        // Estado SQLite
+        const statusSQLite = await window.api.invoke('check-sqlite-status');
+        document.getElementById('sqlite-path').textContent = statusSQLite.path || '-';
+        document.getElementById('sqlite-size').textContent = statusSQLite.size || '-';
+        document.getElementById('sqlite-tickets').textContent = statusSQLite.tickets || '0';
+
+        const pendingEl = document.getElementById('sqlite-pending');
+        const pending = statusSQLite.pending || 0;
+        pendingEl.textContent = pending;
+        pendingEl.style.color = pending > 0 ? '#f59e0b' : '#10b981';
+      } catch (error) {
+        console.error('Error verificando estado:', error);
+      }
+    }
+
+    // ============================================
+    // CARGAR ESTADÍSTICAS
+    // ============================================
+    async function cargarEstadisticas() {
+      try {
+        const stats = await window.api.invoke('get-database-stats');
+        if (stats.success) {
+          document.getElementById('stat-vouchers').textContent = stats.vouchers || 0;
+          document.getElementById('stat-users').textContent = stats.users || 0;
+          document.getElementById('stat-operators').textContent = stats.operators || 0;
+          document.getElementById('stat-logs').textContent = stats.logs || 0;
+        } else {
+          // Mostrar error en las tarjetas
+          document.getElementById('stat-vouchers').innerHTML = '<span style="font-size: 16px;">❌</span>';
+          document.getElementById('stat-users').innerHTML = '<span style="font-size: 16px;">❌</span>';
+          document.getElementById('stat-operators').innerHTML = '<span style="font-size: 16px;">❌</span>';
+          document.getElementById('stat-logs').innerHTML = '<span style="font-size: 16px;">❌</span>';
+        }
+      } catch (error) {
+        console.error('Error cargando estadísticas:', error);
+      }
+    }
+
+    // ============================================
+    // CARGAR LISTA DE BACKUPS
+    // ============================================
+    async function cargarBackups() {
+      try {
+        const result = await window.api.invoke('list-backups');
+        const container = document.getElementById('backup-list');
+        container.innerHTML = '';
+
+        if (result.success && result.backups && result.backups.length > 0) {
+          result.backups.forEach(backup => {
+            const div = document.createElement('div');
+            div.className = 'backup-item';
+            div.innerHTML = `
+              <div class="backup-info">
+                <div class="backup-name">📦 ${backup.name}</div>
+                <div class="backup-meta">${backup.date} • ${backup.size}</div>
+              </div>
+              <div class="backup-actions">
+                <button onclick="restaurarBackupEspecifico('${backup.path.replace(/\\/g, '\\\\')}')" class="btn btn-primary" style="padding: 6px 12px; font-size: 13px;">📥 Restaurar</button>
+                <button onclick="eliminarBackup('${backup.path.replace(/\\/g, '\\\\')}')" class="btn btn-danger" style="padding: 6px 12px; font-size: 13px;">🗑️</button>
+              </div>
+            `;
+            container.appendChild(div);
+          });
+        } else {
+          container.innerHTML = '<p style="color: #64748b; text-align: center; padding: 20px;">No hay backups disponibles. Crea tu primer backup usando el botón de arriba.</p>';
+        }
+      } catch (error) {
+        console.error('Error cargando backups:', error);
+        document.getElementById('backup-list').innerHTML = '<p style="color: #ef4444; text-align: center; padding: 20px;">❌ Error cargando backups</p>';
+      }
+    }
+
+    // ============================================
+    // PROBAR CONEXIÓN A SUPABASE
+    // ============================================
+    async function probarConexion() {
+      const btn = event.target;
+      const originalText = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '⏳ Probando...';
+
+      try {
+        const result = await window.api.invoke('test-supabase-connection');
+
+        if (result.success) {
+          alert(`✅ Conexión exitosa\n\nLatencia: ${result.latency}ms\nBase de datos respondiendo correctamente.`);
+        } else {
+          alert(`❌ Error de conexión\n\n${result.error}`);
+        }
+
+        await verificarEstado();
+      } catch (error) {
+        alert(`❌ Error crítico\n\n${error.message}`);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+      }
+    }
+
+    // ============================================
+    // FORZAR SINCRONIZACIÓN
+    // ============================================
+    async function forzarSync() {
+      const progress = document.getElementById('sync-progress');
+      const fill = document.getElementById('sync-progress-fill');
+      const status = document.getElementById('sync-status');
+
+      progress.style.display = 'block';
+      fill.style.width = '0%';
+      fill.textContent = '0%';
+      status.textContent = 'Iniciando sincronización...';
+
+      try {
+        const result = await window.api.invoke('sync:force-sync');
+
+        if (result.success) {
+          fill.style.width = '100%';
+          fill.textContent = '100%';
+          status.innerHTML = `✅ Sincronizados: <strong>${result.synced || 0}</strong> | ❌ Fallidos: <strong>${result.failed || 0}</strong>`;
+
+          setTimeout(async () => {
+            progress.style.display = 'none';
+            await verificarEstado();
+          }, 3000);
+        } else {
+          fill.style.width = '100%';
+          fill.style.background = '#ef4444';
+          fill.textContent = 'Error';
+          status.textContent = '❌ Error: ' + (result.error || 'Desconocido');
+
+          setTimeout(() => {
+            progress.style.display = 'none';
+          }, 5000);
+        }
+      } catch (error) {
+        fill.style.width = '100%';
+        fill.style.background = '#ef4444';
+        fill.textContent = 'Error';
+        status.textContent = '❌ Error crítico: ' + error.message;
+      }
+    }
+
+    // ============================================
+    // CREAR BACKUP
+    // ============================================
+    async function crearBackup() {
+      if (!confirm('¿Crear backup de la base de datos SQLite local?\n\nEsto creará una copia del archivo de base de datos en la carpeta de backups.')) return;
+
+      const btn = event.target;
+      const originalText = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '⏳ Creando...';
+
+      try {
+        const result = await window.api.invoke('create-backup');
+        if (result.success) {
+          alert(`✅ Backup creado exitosamente\n\nRuta: ${result.path}\nTamaño: ${result.size || 'N/A'}`);
+          await cargarBackups();
+        } else {
+          alert('❌ Error creando backup:\n\n' + result.error);
+        }
+      } catch (error) {
+        alert('❌ Error crítico:\n\n' + error.message);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+      }
+    }
+
+    // ============================================
+    // RESTAURAR BACKUP (SELECCIONAR ARCHIVO)
+    // ============================================
+    async function restaurarBackup() {
+      try {
+        const result = await window.api.invoke('select-backup-file');
+        if (!result.success || !result.path) {
+          console.log('Selección de archivo cancelada');
+          return;
+        }
+
+        if (!confirm(`⚠️ ADVERTENCIA\n\nEsto sobrescribirá la base de datos SQLite actual con el backup seleccionado.\n\nArchivo: ${result.path}\n\n¿Está seguro de continuar?`)) return;
+
+        const restore = await window.api.invoke('restore-backup', result.path);
+        if (restore.success) {
+          alert('✅ Backup restaurado correctamente\n\nLa aplicación se recargará.');
+          location.reload();
+        } else {
+          alert('❌ Error restaurando backup:\n\n' + restore.error);
+        }
+      } catch (error) {
+        alert('❌ Error crítico:\n\n' + error.message);
+      }
+    }
+
+    // ============================================
+    // RESTAURAR BACKUP ESPECÍFICO
+    // ============================================
+    async function restaurarBackupEspecifico(path) {
+      if (!confirm(`⚠️ ADVERTENCIA\n\nEsto sobrescribirá la base de datos actual.\n\n¿Continuar?`)) return;
+
+      try {
+        const result = await window.api.invoke('restore-backup', path);
+        if (result.success) {
+          alert('✅ Backup restaurado correctamente\n\nLa aplicación se recargará.');
+          location.reload();
+        } else {
+          alert('❌ Error:\n\n' + result.error);
+        }
+      } catch (error) {
+        alert('❌ Error crítico:\n\n' + error.message);
+      }
+    }
+
+    // ============================================
+    // ELIMINAR BACKUP
+    // ============================================
+    async function eliminarBackup(path) {
+      if (!confirm('¿Eliminar este backup?\n\nEsta acción no se puede deshacer.')) return;
+
+      try {
+        const result = await window.api.invoke('delete-backup', path);
+        if (result.success) {
+          await cargarBackups();
+        } else {
+          alert('❌ Error eliminando backup:\n\n' + result.error);
+        }
+      } catch (error) {
+        alert('❌ Error crítico:\n\n' + error.message);
+      }
+    }
+
+    // ============================================
+    // ABRIR CARPETA DE BASE DE DATOS
+    // ============================================
+    async function verArchivo() {
+      try {
+        const result = await window.api.invoke('open-database-folder');
+        if (!result.success) {
+          alert('❌ Error abriendo carpeta:\n\n' + result.error);
+        }
+      } catch (error) {
+        alert('❌ Error crítico:\n\n' + error.message);
+      }
+    }
+
+    // ============================================
+    // LIMPIAR CACHÉ LOCAL
+    // ============================================
+    async function limpiarCache() {
+      if (!confirm('⚠️ ADVERTENCIA IMPORTANTE\n\nEsto eliminará TODOS los datos locales de SQLite y resincronizará desde Supabase.\n\nSolo use esta función si:\n- Los datos locales están corruptos\n- Necesita una sincronización completa desde cero\n\n¿Está seguro de continuar?')) return;
+
+      const btn = event.target;
+      const originalText = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '⏳ Limpiando...';
+
+      try {
+        const result = await window.api.invoke('clear-local-cache');
+        if (result.success) {
+          alert('✅ Caché limpiado\n\nAhora se sincronizará automáticamente con Supabase.');
+          await forzarSync();
+        } else {
+          alert('❌ Error limpiando caché:\n\n' + result.error);
+        }
+      } catch (error) {
+        alert('❌ Error crítico:\n\n' + error.message);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+      }
+    }
+
+    // ============================================
+    // VACIAR LOGS ANTIGUOS
+    // ============================================
+    async function vaciarLogs() {
+      if (!confirm('¿Eliminar logs de auditoría de más de 90 días?\n\nEsto liberará espacio en Supabase pero eliminará el historial antiguo permanentemente.\n\n¿Continuar?')) return;
+
+      const btn = event.target;
+      const originalText = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '⏳ Eliminando...';
+
+      try {
+        const result = await window.api.invoke('purge-old-logs', 90);
+        if (result.success) {
+          alert(`✅ Logs antiguos eliminados\n\nEliminados: ${result.deleted || 0} registros`);
+          await cargarEstadisticas();
+        } else {
+          alert('❌ Error:\n\n' + result.error);
+        }
+      } catch (error) {
+        alert('❌ Error crítico:\n\n' + error.message);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+      }
+    }
+
+    // ============================================
+    // VOLVER A CONFIGURACIÓN
+    // ============================================
+    async function volverConfig() {
+      try {
+        await window.api.invoke('open-view', 'config');
+      } catch (error) {
+        console.error('Error volviendo a config:', error);
+        alert('Error navegando a configuración');
+      }
+    }
+
+    // Inicializar al cargar
+    document.addEventListener('DOMContentLoaded', init);
+
+    // Actualizar estado cada 30 segundos
+    setInterval(verificarEstado, 30000);
+  </script>
+</body>
+</html>

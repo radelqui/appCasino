@@ -37,7 +37,7 @@
   <header>
     <h1>Gestión de Operadores</h1>
     <nav>
-      <button class="button" id="btnVolver">Volver al Panel</button>
+      <button class="button" id="btnVolver">← Volver a Configuración</button>
     </nav>
   </header>
 
@@ -96,7 +96,7 @@
       setTimeout(() => statusEl.textContent = '', 5000);
     }
 
-    let operadorEditando = null; // Para modo edición
+    let operadorEnEdicion = null; // Para modo edición
 
     // ============================================
     // CARGAR OPERADORES
@@ -177,6 +177,7 @@
               <button class="button danger" data-action="deactivate" data-id="${op.id}">🗑️ Desactivar</button>
             ` : `
               <button class="button success" data-action="activate" data-id="${op.id}">✅ Reactivar</button>
+              <button class="button danger" data-action="delete" data-id="${op.id}">❌ Eliminar</button>
             `}
           </div>
         </div>
@@ -197,6 +198,10 @@
       } else if (action === 'deactivate') {
         if (confirm('¿Desactivar este operador? No aparecerá en la lista de Mesa.')) {
           await toggleOperador(operadorId, false);
+        }
+      } else if (action === 'delete') {
+        if (confirm('⚠️ ¿ELIMINAR PERMANENTEMENTE este operador? Esta acción NO se puede deshacer.')) {
+          await eliminarOperador(operadorId);
         }
       }
     }
@@ -221,10 +226,29 @@
     }
 
     // ============================================
+    // ELIMINAR OPERADOR
+    // ============================================
+    async function eliminarOperador(operadorId) {
+      try {
+        const result = await window.api?.invoke?.('delete-operador', operadorId);
+
+        if (result.success) {
+          msg('✅ Operador eliminado exitosamente', true);
+          cargarOperadores(); // Recargar lista
+        } else {
+          msg('❌ Error: ' + (result.error || 'Desconocido'), false);
+        }
+      } catch (error) {
+        console.error('❌ Error eliminando operador:', error);
+        msg('❌ Error al eliminar operador', false);
+      }
+    }
+
+    // ============================================
     // MODAL: NUEVO OPERADOR
     // ============================================
     document.getElementById('btnNuevo').addEventListener('click', () => {
-      operadorEditando = null;
+      operadorEnEdicion = null;
       document.getElementById('modal-title').textContent = 'Nuevo Operador';
       document.getElementById('nombre-operador').value = '';
       document.getElementById('mesas-operador').value = '';
@@ -234,20 +258,53 @@
     // ============================================
     // MODAL: EDITAR OPERADOR
     // ============================================
-    function editarOperador(operadorId) {
-      // TODO: Cargar datos del operador y mostrar en modal
-      alert('Función de editar en desarrollo. Por ahora puedes desactivar y crear uno nuevo.');
+
+    async function editarOperador(operadorId) {
+      try {
+        console.log('✏️ Editando operador:', operadorId);
+
+        // Obtener todos los operadores para encontrar el que queremos editar
+        const result = await window.api?.invoke?.('get-all-operadores');
+
+        if (!result?.success || !result.operadores) {
+          msg('❌ Error cargando operador', false);
+          return;
+        }
+
+        const operador = result.operadores.find(op => op.id === operadorId);
+
+        if (!operador) {
+          msg('❌ Operador no encontrado', false);
+          return;
+        }
+
+        // Guardar referencia al operador en edición
+        operadorEnEdicion = operador;
+
+        // Llenar formulario con datos del operador
+        document.getElementById('modal-title').textContent = 'Editar Operador';
+        document.getElementById('nombre-operador').value = operador.nombre || '';
+        document.getElementById('mesas-operador').value = operador.mesas_asignadas || '';
+
+        // Mostrar modal
+        document.getElementById('modal-operador').classList.add('show');
+
+      } catch (error) {
+        console.error('❌ Error editando operador:', error);
+        msg('❌ Error editando operador', false);
+      }
     }
 
     // ============================================
     // MODAL: CANCELAR
     // ============================================
     document.getElementById('btnCancelar').addEventListener('click', () => {
+      operadorEnEdicion = null;
       document.getElementById('modal-operador').classList.remove('show');
     });
 
     // ============================================
-    // MODAL: GUARDAR OPERADOR
+    // MODAL: GUARDAR OPERADOR (Crear o Editar)
     // ============================================
     document.getElementById('btnGuardar').addEventListener('click', async () => {
       const nombre = document.getElementById('nombre-operador').value.trim();
@@ -265,21 +322,44 @@
         : [];
 
       try {
-        const result = await window.api?.invoke?.('create-operador', {
-          nombre: nombre,
-          mesas: mesas
-        });
+        let result;
+
+        // Determinar si es creación o edición
+        if (operadorEnEdicion) {
+          // MODO EDICIÓN: Actualizar operador existente
+          console.log('✏️ Actualizando operador:', operadorEnEdicion.id);
+          result = await window.api?.invoke?.('update-operador', operadorEnEdicion.id, {
+            nombre: nombre,
+            mesas_asignadas: mesas
+          });
+
+          if (result.success) {
+            msg(`✅ Operador "${nombre}" actualizado exitosamente`, true);
+          }
+        } else {
+          // MODO CREACIÓN: Crear nuevo operador
+          console.log('➕ Creando nuevo operador');
+          result = await window.api?.invoke?.('create-operador', {
+            nombre: nombre,
+            mesas: mesas
+          });
+
+          if (result.success) {
+            msg(`✅ Operador "${nombre}" creado exitosamente`, true);
+          }
+        }
 
         if (result.success) {
-          msg(`✅ Operador "${nombre}" creado exitosamente`, true);
+          // Resetear estado y cerrar modal
+          operadorEnEdicion = null;
           document.getElementById('modal-operador').classList.remove('show');
           cargarOperadores(); // Recargar lista
         } else {
           alert('❌ Error: ' + (result.error || 'Desconocido'));
         }
       } catch (error) {
-        console.error('❌ Error creando operador:', error);
-        alert('❌ Error al crear operador');
+        console.error('❌ Error guardando operador:', error);
+        alert('❌ Error al guardar operador');
       }
     });
 
@@ -288,9 +368,12 @@
     // ============================================
     document.getElementById('btnVolver').addEventListener('click', async () => {
       try {
-        await window.api?.closeCurrent?.();
-      } catch (_) {
-        try { window.close(); } catch {}
+        const result = await window.api?.invoke?.('open-view', 'config');
+        if (!result?.success) {
+          console.error('❌ Error abriendo configuración:', result?.error);
+        }
+      } catch (error) {
+        console.error('❌ Error volviendo a configuración:', error);
       }
     });
 

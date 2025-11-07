@@ -1,0 +1,33 @@
+========================================
+SOLUCIÓN RÁPIDA - SINCRONIZAR USUARIOS
+========================================
+
+1. npm start
+
+2. Ctrl + Shift + I (abrir consola)
+
+3. Copiar y pegar en la pestaña "Console":
+
+window.api.invoke('force-sync-users').then(result => {
+  console.log('✅ Resultado:', result);
+  if (result.success) {
+    alert(`✅ Sincronización completada!\n\nUsuarios nuevos: ${result.synced}\nUsuarios actualizados: ${result.updated}\nTotal en SQLite: ${result.total}`);
+  } else {
+    alert(`❌ Error: ${result.error}`);
+  }
+});
+
+4. Enter
+
+5. Esperar 5-10 segundos
+
+6. ¡Listo! Todos los usuarios de Supabase ahora funcionan para login
+
+========================================
+QUÉ HACE:
+- Arregla la tabla usuarios automáticamente
+- Sincroniza TODOS los usuarios de Supabase a SQLite
+- Permite login con todos los usuarios
+
+SOLO NECESITAS HACERLO UNA VEZ
+========================================
