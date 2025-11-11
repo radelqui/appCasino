@@ -1,19 +1,28 @@
 {
-  "productName": "Casino Vouchers (Pure)",
+  "productName": "Casino Vouchers Pure",
   "appId": "com.coralreef.casinovouchers.pure",
+  "directories": {
+    "output": "dist"
+  },
   "files": [
-    "Electron_Puro/**/*",
-    "Caja/**/*",
     "pure/**/*",
-    "src/main/**/*",
     "package.json",
-    "node_modules/**/*"
+    "node_modules/**/*",
+    "!node_modules/**/test/**",
+    "!node_modules/**/*.md",
+    "!**/*.map"
   ],
   "extraMetadata": {
-    "main": "Electron_Puro/main.js"
+    "main": "pure/main.js"
   },
   "win": {
-    "target": ["dir"],
-    "artifactName": "casino-vouchers-pure-${version}-${arch}"
-  }
+    "target": ["portable"],
+    "requestedExecutionLevel": "asInvoker"
+  },
+  "portable": {
+    "artifactName": "CasinoVouchersPure.exe",
+    "requestExecutionLevel": "user",
+    "unpackDirName": "casino-data"
+  },
+  "compression": "maximum"
 }
