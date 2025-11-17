@@ -1,0 +1,50 @@
+name: CodeWiki → NotebookLM Sync
+
+on:
+  push:
+    paths:
+      - '**.md'
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+jobs:
+  sync-to-notebooklm:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: |
+          npm install -g @google/clasp
+          npm install marked html-to-docx googleapis
+
+      - name: Authenticate with Google
+        env:
+          GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
+          GOOGLE_FOLDER_ID: ${{ secrets.GOOGLE_FOLDER_ID }}
+        run: |
+          echo "$GOOGLE_CREDENTIALS" > credentials.json
+          export GOOGLE_APPLICATION_CREDENTIALS=credentials.json
+
+      - name: Convert and Upload Markdown files
+        env:
+          GOOGLE_FOLDER_ID: ${{ secrets.GOOGLE_FOLDER_ID }}
+          REPO_NAME: ${{ github.event.repository.name }}
+        run: |
+          node .github/scripts/sync-to-drive.js
+
+      - name: Cleanup
+        if: always()
+        run: |
+          rm -f credentials.json
