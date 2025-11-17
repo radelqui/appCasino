@@ -37,6 +37,7 @@ async function initGoogleDrive() {
 
 /**
  * Encuentra todos los archivos .md en el repositorio
+ * FILTRADO: Solo sincroniza archivos CODEWIKI para ahorrar espacio en Drive
  */
 async function findMarkdownFiles(dir = '.', files = []) {
   const entries = await fs.readdir(dir, { withFileTypes: true });
@@ -50,7 +51,10 @@ async function findMarkdownFiles(dir = '.', files = []) {
         await findMarkdownFiles(fullPath, files);
       }
     } else if (entry.name.endsWith('.md')) {
-      files.push(fullPath);
+      // Solo sincronizar archivos CODEWIKI (son los importantes para NotebookLM)
+      if (entry.name.startsWith('CODEWIKI') || entry.name === 'README.md') {
+        files.push(fullPath);
+      }
     }
   }
 
